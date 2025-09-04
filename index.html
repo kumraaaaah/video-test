@@ -2,12 +2,14 @@
 <html>
 
 <head>
-    <script src="https://aframe.io/releases/1.0.4/aframe.min.js"></script>
-    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+    <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.5/aframe/build/aframe-ar.js"></script>
+
     <script src="https://raw.githack.com/AR-js-org/studio-backend/master/src/modules/marker/tools/gesture-detector.js"></script>
     <script src="https://raw.githack.com/AR-js-org/studio-backend/master/src/modules/marker/tools/gesture-handler.js"></script>
+    
     <script>
-        // This script is correct and does not need changes.
+        // This JavaScript logic is correct and remains unchanged
         AFRAME.registerComponent('scene-manager', {
             init: function() {
                 this.marker = document.querySelector("a-marker");
@@ -19,19 +21,15 @@
                 this.marker.addEventListener('markerFound', () => {
                     if (!this.isPlaced) {
                         this.isPlaced = true;
-
                         const markerPosition = new THREE.Vector3();
                         this.marker.object3D.getWorldPosition(markerPosition);
                         this.videoEntity.setAttribute('position', markerPosition);
-
                         const cameraPosition = new THREE.Vector3();
                         this.camera.object3D.getWorldPosition(cameraPosition);
                         this.videoEntity.setAttribute('look-at', cameraPosition);
-
                         setTimeout(() => {
                            this.videoEntity.removeAttribute('look-at');
                         }, 100);
-
                         this.videoEntity.setAttribute('visible', 'true');
                         this.vid.play();
                     }
@@ -44,7 +42,7 @@
 <body style="margin: 0; overflow: hidden;">
     
     <a-scene vr-mode-ui="enabled: false" loading-screen="enabled: false;"
-        arjs='sourceType: webcam; debugUIEnabled: false; trackingMethod: best;' 
+        arjs='sourceType: webcam; trackingMethod: best; debugUIEnabled: true;' 
         id="scene" embedded gesture-detector scene-manager>
 
         <a-assets>
