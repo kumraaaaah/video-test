@@ -1,56 +1,46 @@
 <!doctype html>
 <html>
   <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>AR Video with Gestures</title>
-
-    <!-- A-Frame -->
     <script src="https://aframe.io/releases/1.0.4/aframe.min.js"></script>
-    <!-- AR.js -->
-    <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/aframe/build/aframe-ar.js"></script>
-    <!-- Gesture libs -->
+    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
     <script src="https://raw.githack.com/AR-js-org/studio-backend/master/src/modules/marker/tools/gesture-detector.js"></script>
     <script src="https://raw.githack.com/AR-js-org/studio-backend/master/src/modules/marker/tools/gesture-handler.js"></script>
 
     <script>
-      AFRAME.registerComponent("videohandler", {
+      AFRAME.registerComponent("videospawner", {
         init: function () {
           const marker = this.el;
           const sceneEl = document.querySelector("a-scene");
-          this.vid = document.querySelector("#vid");
+          const vid = document.querySelector("#vid");
+          let spawned = false;
 
           marker.addEventListener("markerFound", () => {
-            // reset video each time marker is found
-            this.vid.pause();
-            this.vid.currentTime = 0;
-            this.vid.play();
+            if (!spawned) {
+              // create container so gestures can apply
+              const container = document.createElement("a-entity");
+              container.setAttribute("id", "videoContainer");
+              container.setAttribute("gesture-handler", "");
 
-            // remove old container if any
-            const old = document.querySelector("#videoContainer");
-            if (old) old.parentNode.removeChild(old);
+              // video entity
+              const videoEntity = document.createElement("a-video");
+              videoEntity.setAttribute("src", "#vid");
+              videoEntity.setAttribute("scale", "1 1 1");
+              videoEntity.setAttribute("position", "0 0 -2");
+              videoEntity.setAttribute("rotation", "0 0 0");
+              videoEntity.setAttribute("class", "clickable");
 
-            // wrapper for gestures
-            const container = document.createElement("a-entity");
-            container.setAttribute("id", "videoContainer");
-            container.setAttribute("gesture-handler", "");
+              container.appendChild(videoEntity);
+              sceneEl.appendChild(container);
 
-            // video entity
-            const videoEntity = document.createElement("a-video");
-            videoEntity.setAttribute("src", "#vid");
-
-            // 👇 smaller and a bit farther away
-            videoEntity.setAttribute("scale", "0.5 0.5 0.5");
-            videoEntity.setAttribute("position", "0 0 -3");
-            videoEntity.setAttribute("rotation", "0 0 0");
-            videoEntity.setAttribute("class", "clickable");
-
-            container.appendChild(videoEntity);
-            sceneEl.appendChild(container);
+              // start video
+              vid.play();
+              spawned = true;
+            }
           });
 
+          // markerLost doesn’t remove or pause video
           marker.addEventListener("markerLost", () => {
-            // do nothing — video stays in world
+            // do nothing → video persists
           });
         },
       });
@@ -71,7 +61,7 @@
           id="vid"
           src="assets/asset.mp4"
           preload="auto"
-          loop="false"
+          loop
           crossorigin
           webkit-playsinline
           autoplay
@@ -80,14 +70,16 @@
         ></video>
       </a-assets>
 
+      <!-- marker just acts as a trigger -->
       <a-marker
         type="pattern"
         preset="custom"
         url="assets/marker.patt"
-        videohandler
+        videospawner
         emitevents="true"
         id="markerA"
-      ></a-marker>
+      >
+      </a-marker>
 
       <a-entity camera></a-entity>
     </a-scene>
