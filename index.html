@@ -10,28 +10,27 @@
         // --- MODIFIED SCRIPT ---
         AFRAME.registerComponent('videohandler', {
             init: function() {
-                // Get the necessary elements
                 this.marker = this.el;
                 this.videoEntity = document.querySelector("#ar-video");
                 this.vid = document.querySelector("#vid");
-                this.isPlaced = false; // A flag to check if the video has been placed
+                this.isPlaced = false;
 
-                // Marker is found
                 this.marker.addEventListener('markerFound', () => {
-                    // Check if the video has already been placed in the world
                     if (!this.isPlaced) {
-                        this.isPlaced = true; // Set the flag to true
+                        this.isPlaced = true;
 
-                        // Make the video entity visible
+                        // Get the marker's real-world position
+                        const markerPosition = new THREE.Vector3();
+                        this.marker.object3D.getWorldPosition(markerPosition);
+
+                        // Set the video's starting position to where the marker was found
+                        this.videoEntity.setAttribute('position', markerPosition);
+
+                        // Make the video visible and play it
                         this.videoEntity.setAttribute('visible', 'true');
-
-                        // Play the video
                         this.vid.play();
                     }
                 });
-
-                // We no longer need a 'markerLost' listener, 
-                // so the video will not pause when the marker is gone.
             },
         });
     </script>
@@ -46,14 +45,13 @@
                 webkit-playsinline autoplay muted playsinline></video>
         </a-assets>
 
-        <a-marker type="pattern" preset="custom" url="assets/marker.patt" videohandler smooth="true" smoothCount="10"
-            smoothTolerance="0.01" smoothThreshold="5">
-            </a-marker>
+        <a-marker type="pattern" preset="custom" url="assets/marker.patt" videohandler></a-marker>
 
-        <a-video id="ar-video" src="#vid" scale="1 1 1" position="0 0.1 0" rotation="-90 0 0" class="clickable"
+        <a-video id="ar-video" src="#vid" scale="1 1 1" position="0 0 0" rotation="-90 0 0" class="clickable"
             gesture-handler visible="false"></a-video>
 
-        <a-entity camera></a-entity>
+        <a-entity camera cursor="rayOrigin: mouse" raycaster="objects: .clickable"></a-entity>
+
     </a-scene>
 </body>
 
