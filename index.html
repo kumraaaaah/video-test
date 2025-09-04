@@ -4,13 +4,10 @@
 <head>
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.5/aframe/build/aframe-ar.js"></script>
-    <script src="https://raw.githack.com/AR-js-org/studio-backend/master/src/modules/marker/tools/gesture-detector.js"></script>
-    <script src="https://raw.githack.com/AR-js-org/studio-backend/master/src/modules/marker/tools/gesture-handler.js"></script>
+    
+    <script src="https://unpkg.com/super-hands@3.0.1/dist/super-hands.min.js"></script>
     
     <script>
-        // --- KEY CHANGE: Simplified JavaScript ---
-        // This script now only makes the video visible and plays it.
-        // It no longer needs to calculate any positions.
         AFRAME.registerComponent('scene-manager', {
             init: function() {
                 this.marker = document.querySelector("a-marker");
@@ -21,7 +18,6 @@
                 this.marker.addEventListener('markerFound', () => {
                     if (!this.isPlaced) {
                         this.isPlaced = true;
-                        // Simply make the video visible and play it.
                         this.videoEntity.setAttribute('visible', 'true');
                         this.vid.play();
                     }
@@ -35,7 +31,7 @@
     
     <a-scene vr-mode-ui="enabled: false" loading-screen="enabled: false;"
         arjs='sourceType: webcam; trackingMethod: best; debugUIEnabled: false;' 
-        id="scene" embedded gesture-detector scene-manager>
+        id="scene" embedded scene-manager>
 
         <a-assets>
             <video id="vid" src="assets/asset.mp4" preload="auto" response-type="arraybuffer" loop crossorigin
@@ -44,10 +40,10 @@
         
         <a-marker type="pattern" preset="custom" url="assets/marker.patt"></a-marker>
         
-        <a-entity camera cursor="rayOrigin: mouse" raycaster="objects: .clickable">
+        <a-entity camera cursor="rayOrigin: mouse" super-hands>
 
-            <a-video id="ar-video" src="#vid" scale="0.8 0.8 0.8" position="0 0 -2" rotation="0 0 0" class="clickable"
-                gesture-handler visible="false"></a-video>
+            <a-video id="ar-video" src="#vid" scale="0.8 0.8 0.8" position="0 0 -2" rotation="0 0 0" 
+                grabbable stretchable visible="false"></a-video>
 
         </a-entity>
 
