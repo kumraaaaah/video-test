@@ -24,20 +24,21 @@
             }
         });
 
-        // --- CUSTOM SCRIPT FOR MANIPULATION ---
+        // --- UPDATED SCRIPT FOR 2D and 3D MANIPULATION ---
         AFRAME.registerComponent('screen-manipulator', {
             init: function () {
                 this.target = this.el.object3D;
                 this.canvas = this.el.sceneEl.canvas;
 
                 this.touchState = {
-                    isDragging: false,
-                    isPinching: false,
+                    isOneFingerRotating: false,
+                    isTwoFingerManipulating: false,
                     startDist: 0,
                     startAngle: 0,
                     startScale: new THREE.Vector3(),
-                    startRotationZ: 0,
-                    lastPos: { x: 0, y: 0 }
+                    startRotation: new THREE.Euler(),
+                    lastPanPos: { x: 0, y: 0 },
+                    lastRotatePos: { x: 0, y: 0 }
                 };
 
                 // Bind event listeners
@@ -51,51 +52,74 @@
 
             onTouchStart: function (e) {
                 if (e.touches.length === 1) {
-                    this.touchState.isDragging = true;
-                    this.touchState.lastPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+                    this.touchState.isOneFingerRotating = true;
+                    this.touchState.lastRotatePos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
                 } else if (e.touches.length === 2) {
-                    this.touchState.isPinching = true;
-                    const dx = e.touches[0].clientX - e.touches[1].clientX;
-                    const dy = e.touches[0].clientY - e.touches[1].clientY;
+                    this.touchState.isTwoFingerManipulating = true;
+                    const t0 = e.touches[0];
+                    const t1 = e.touches[1];
+                    const dx = t0.clientX - t1.clientX;
+                    const dy = t0.clientY - t1.clientY;
+
+                    // For Pinch/Twist
                     this.touchState.startDist = Math.sqrt(dx * dx + dy * dy);
                     this.touchState.startAngle = Math.atan2(dy, dx);
                     this.touchState.startScale.copy(this.target.scale);
-                    this.touchState.startRotationZ = this.target.rotation.z;
+                    this.touchState.startRotation.copy(this.target.rotation);
+
+                    // For Pan
+                    this.touchState.lastPanPos = { 
+                        x: (t0.clientX + t1.clientX) / 2,
+                        y: (t0.clientY + t1.clientY) / 2
+                    };
                 }
                 this.canvas.addEventListener('touchmove', this.onTouchMove);
             },
 
             onTouchMove: function (e) {
-                if (this.touchState.isDragging && e.touches.length === 1) {
-                    const currentX = e.touches[0].clientX;
-                    const currentY = e.touches[0].clientY;
-                    const deltaX = currentX - this.touchState.lastPos.x;
-                    const deltaY = currentY - this.touchState.lastPos.y;
-                    const sensitivity = 0.005; 
-                    this.target.position.x += deltaX * sensitivity;
-                    this.target.position.y -= deltaY * sensitivity;
-                    this.touchState.lastPos = { x: currentX, y: currentY };
-                }
+                // --- NEW: One-finger drag for 3D rotation ---
+                if (this.touchState.isOneFingerRotating && e.touches.length === 1) {
+                    const currentPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+                    const deltaX = currentPos.x - this.touchState.lastRotatePos.x;
+                    const deltaY = currentPos.y - this.touchState.lastRotatePos.y;
+                    const sensitivity = 0.01;
 
-                if (this.touchState.isPinching && e.touches.length === 2) {
-                    const dx = e.touches[0].clientX - e.touches[1].clientX;
-                    const dy = e.touches[0].clientY - e.touches[1].clientY;
-                    
+                    this.target.rotation.y += deltaX * sensitivity;
+                    this.target.rotation.x += deltaY * sensitivity;
+
+                    this.touchState.lastRotatePos = currentPos;
+                }
+                
+                // --- MODIFIED: Two-finger gestures for Pan, Pinch, and 2D Twist ---
+                if (this.touchState.isTwoFingerManipulating && e.touches.length === 2) {
+                    const t0 = e.touches[0];
+                    const t1 = e.touches[1];
+                    const dx = t0.clientX - t1.clientX;
+                    const dy = t0.clientY - t1.clientY;
+
+                    // Pan (Move) logic
+                    const currentPanPos = { x: (t0.clientX + t1.clientX) / 2, y: (t0.clientY + t1.clientY) / 2 };
+                    const panDeltaX = currentPanPos.x - this.touchState.lastPanPos.x;
+                    const panDeltaY = currentPanPos.y - this.touchState.lastPanPos.y;
+                    const panSensitivity = 0.005;
+                    this.target.position.x += panDeltaX * panSensitivity;
+                    this.target.position.y -= panDeltaY * panSensitivity;
+                    this.touchState.lastPanPos = currentPanPos;
+
+                    // Pinch (Scale) and Twist (2D Rotate) logic
                     const currentDist = Math.sqrt(dx * dx + dy * dy);
                     const scaleFactor = currentDist / this.touchState.startDist;
                     this.target.scale.copy(this.touchState.startScale).multiplyScalar(scaleFactor);
 
                     const currentAngle = Math.atan2(dy, dx);
                     const deltaAngle = currentAngle - this.touchState.startAngle;
-                    
-                    // KEY CHANGE: Subtracted the angle difference instead of adding it.
-                    this.target.rotation.z = this.touchState.startRotationZ - deltaAngle;
+                    this.target.rotation.z = this.touchState.startRotation.z - deltaAngle;
                 }
             },
 
             onTouchEnd: function (e) {
-                this.touchState.isDragging = false;
-                this.touchState.isPinching = false;
+                this.touchState.isOneFingerRotating = false;
+                this.touchState.isTwoFingerManipulating = false;
                 this.canvas.removeEventListener('touchmove', this.onTouchMove);
             }
         });
@@ -116,12 +140,11 @@
         <a-marker type="pattern" preset="custom" url="assets/marker.patt"></a-marker>
         
         <a-entity camera>
-
             <a-video id="ar-video" src="#vid" scale="0.8 0.8 0.8" position="0 0 -2" rotation="0 0 0" 
                 screen-manipulator visible="false"></a-video>
-
         </a-entity>
 
     </a-scene>
 </body>
+
 </html>
