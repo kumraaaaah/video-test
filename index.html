@@ -6,7 +6,7 @@
     <script src="https://raw.githack.com/AR-js-org/studio-backend/master/src/modules/marker/tools/gesture-detector.js"></script>
 
     <script>
-      // custom gesture handler
+      // custom gesture handler for rotation + pinch zoom
       AFRAME.registerComponent("custom-gesture-handler", {
         schema: { enabled: { default: true } },
         init: function () {
@@ -27,7 +27,7 @@
         },
         handleRotation: function (event) {
           if (!this.data.enabled) return;
-          this.rotationFactor += -event.detail.angleChange; // fix inverted feeling
+          this.rotationFactor += -event.detail.angleChange; // feel natural
           this.el.setAttribute("rotation", {
             x: 0,
             y: this.rotationFactor,
@@ -47,27 +47,42 @@
       // video handler
       AFRAME.registerComponent("videohandler", {
         init: function () {
-          var marker = this.el;
+          const marker = this.el;
           this.vid = document.querySelector("#vid");
-          this.videoEntity = document.querySelector("#videoEntity");
+          const sceneEl = document.querySelector("a-scene");
 
-          marker.addEventListener("markerFound", function () {
-            // reset & play
+          marker.addEventListener("markerFound", () => {
+            // reset video each time marker is found
             this.vid.currentTime = 0;
             this.vid.play();
 
-            // clone video into scene
-            if (!this.videoPlaced) {
-              let clone = this.videoEntity.cloneNode();
-              clone.setAttribute("visible", "true");
-              this.el.sceneEl.appendChild(clone);
-              this.videoPlaced = true;
-            }
-          }.bind(this));
+            // remove any previous instance
+            const old = document.querySelector("#videoContainer");
+            if (old) old.parentNode.removeChild(old);
 
-          marker.addEventListener("markerLost", function () {
-            // don’t pause video, keep playing in world
-          }.bind(this));
+            // wrapper entity to allow gestures
+            const container = document.createElement("a-entity");
+            container.setAttribute("id", "videoContainer");
+            container.setAttribute("custom-gesture-handler", "");
+
+            // video entity
+            const videoEntity = document.createElement("a-video");
+            videoEntity.setAttribute("src", "#vid");
+            videoEntity.setAttribute("scale", "1 1 1");
+            videoEntity.setAttribute("position", "0 0 -2");
+            videoEntity.setAttribute("rotation", "0 0 0");
+            videoEntity.setAttribute("class", "clickable");
+
+            // append video to container
+            container.appendChild(videoEntity);
+
+            // add container to scene (not marker)
+            sceneEl.appendChild(container);
+          });
+
+          marker.addEventListener("markerLost", () => {
+            // do nothing — video persists in world
+          });
         },
       });
     </script>
@@ -78,6 +93,7 @@
       vr-mode-ui="enabled: false"
       loading-screen="enabled: false;"
       arjs="sourceType: webcam; debugUIEnabled: false;"
+      id="scene"
       embedded
       gesture-detector
     >
@@ -87,7 +103,7 @@
           src="assets/asset.mp4"
           preload="auto"
           response-type="arraybuffer"
-          loop
+          loop="false"
           crossorigin
           webkit-playsinline
           autoplay
@@ -96,6 +112,7 @@
         ></video>
       </a-assets>
 
+      <!-- marker just acts as a trigger -->
       <a-marker
         type="pattern"
         preset="custom"
@@ -104,15 +121,6 @@
         emitevents="true"
         id="markerA"
       >
-        <a-video
-          id="videoEntity"
-          src="#vid"
-          scale="1 1 1"
-          position="0 0.1 0"
-          rotation="-90 0 0"
-          visible="false"
-          custom-gesture-handler
-        ></a-video>
       </a-marker>
 
       <a-entity camera></a-entity>
