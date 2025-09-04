@@ -1,67 +1,93 @@
 <!doctype html>
 <html>
   <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>AR marker → persistent video w/ gestures (fixed scale)</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>AR Video with Gestures</title>
 
     <!-- A-Frame -->
     <script src="https://aframe.io/releases/1.0.4/aframe.min.js"></script>
-
-    <!-- AR.js A-Frame build -->
+    <!-- AR.js -->
     <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/aframe/build/aframe-ar.js"></script>
-
-    <!-- gesture-detector (emits onefinger*/twofinger* events for touch) -->
+    <!-- Gesture libs -->
     <script src="https://raw.githack.com/AR-js-org/studio-backend/master/src/modules/marker/tools/gesture-detector.js"></script>
+    <script src="https://raw.githack.com/AR-js-org/studio-backend/master/src/modules/marker/tools/gesture-handler.js"></script>
 
-    <!-- custom gesture handler (robust) -->
     <script>
-      (function () {
-        AFRAME.registerComponent("custom-gesture-handler", {
-          schema: {
-            enabled: { type: "boolean", default: true },
-            minScale: { type: "number", default: 0.3 },
-            maxScale: { type: "number", default: 5 },
-            rotateSensitivity: { type: "number", default: 0.6 }
-          },
+      AFRAME.registerComponent("videohandler", {
+        init: function () {
+          const marker = this.el;
+          const sceneEl = document.querySelector("a-scene");
+          this.vid = document.querySelector("#vid");
 
-          init: function () {
-            this.sceneEl = this.el.sceneEl || document.querySelector("a-scene");
-            this._onOneStart = this._onOneStart.bind(this);
-            this._onOneMove = this._onOneMove.bind(this);
-            this._onOneEnd = this._onOneEnd.bind(this);
-            this._onTwoStart = this._onTwoStart.bind(this);
-            this._onTwoMove = this._onTwoMove.bind(this);
-            this._onTwoEnd = this._onTwoEnd.bind(this);
+          marker.addEventListener("markerFound", () => {
+            // reset video each time marker is found
+            this.vid.pause();
+            this.vid.currentTime = 0;
+            this.vid.play();
 
-            this.isOne = false;
-            this.isTwo = false;
+            // remove old container if any
+            const old = document.querySelector("#videoContainer");
+            if (old) old.parentNode.removeChild(old);
 
-            const s = this.el.object3D && this.el.object3D.scale ? this.el.object3D.scale : null;
-            this.currentScale = s ? s.x : 1;
-            this.startSpread = null;
-            this.startAngle = null;
-            this.startScale = this.currentScale;
-            this.startRotationYDeg = this._getRotationYDeg();
+            // wrapper for gestures
+            const container = document.createElement("a-entity");
+            container.setAttribute("id", "videoContainer");
+            container.setAttribute("gesture-handler", "");
 
-            this.lastOneX = null;
-            this.oneStartRotY = this._getRotationYDeg();
-          },
+            // video entity
+            const videoEntity = document.createElement("a-video");
+            videoEntity.setAttribute("src", "#vid");
+            videoEntity.setAttribute("scale", "1 1 1");
+            videoEntity.setAttribute("position", "0 0 -2");
+            videoEntity.setAttribute("rotation", "0 0 0");
+            videoEntity.setAttribute("class", "clickable");
 
-          play: function () {
-            if (!this.sceneEl) return;
-            this.sceneEl.addEventListener("onefingerstart", this._onOneStart);
-            this.sceneEl.addEventListener("onefingermove", this._onOneMove);
-            this.sceneEl.addEventListener("onefingerend", this._onOneEnd);
-            this.sceneEl.addEventListener("twofingerstart", this._onTwoStart);
-            this.sceneEl.addEventListener("twofingermove", this._onTwoMove);
-            this.sceneEl.addEventListener("twofingerend", this._onTwoEnd);
-          },
+            container.appendChild(videoEntity);
+            sceneEl.appendChild(container);
+          });
 
-          pause: function () {
-            if (!this.sceneEl) return;
-            this.sceneEl.removeEventListener("onefingerstart", this._onOneStart);
-            this.sceneEl.removeEventListener("onefingermove", this._onOneMove);
-            this.sceneEl.removeEventListener("onefingerend", this._onOneEnd);
-            this.sceneEl.removeEventListener("twofingerstart", this._onTwoStart);
-            this.sceneEl.removeEventListener("two
+          marker.addEventListener("markerLost", () => {
+            // do nothing — video stays in world
+          });
+        },
+      });
+    </script>
+  </head>
+
+  <body style="margin: 0; overflow: hidden;">
+    <a-scene
+      vr-mode-ui="enabled: false"
+      loading-screen="enabled: false;"
+      arjs="sourceType: webcam; debugUIEnabled: false;"
+      id="scene"
+      embedded
+      gesture-detector
+    >
+      <a-assets>
+        <video
+          id="vid"
+          src="assets/asset.mp4"
+          preload="auto"
+          loop="false"
+          crossorigin
+          webkit-playsinline
+          autoplay
+          muted
+          playsinline
+        ></video>
+      </a-assets>
+
+      <a-marker
+        type="pattern"
+        preset="custom"
+        url="assets/marker.patt"
+        videohandler
+        emitevents="true"
+        id="markerA"
+      ></a-marker>
+
+      <a-entity camera></a-entity>
+    </a-scene>
+  </body>
+</html>
