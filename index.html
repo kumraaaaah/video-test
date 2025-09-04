@@ -7,6 +7,7 @@
     <script src="https://raw.githack.com/AR-js-org/studio-backend/master/src/modules/marker/tools/gesture-handler.js"></script>
 
     <script>
+      // spawns video when marker is first seen
       AFRAME.registerComponent("videospawner", {
         init: function () {
           const marker = this.el;
@@ -16,10 +17,11 @@
 
           marker.addEventListener("markerFound", () => {
             if (!spawned) {
-              // create container so gestures can apply
+              // container to hold video and allow gestures
               const container = document.createElement("a-entity");
               container.setAttribute("id", "videoContainer");
               container.setAttribute("gesture-handler", "");
+              container.setAttribute("scalable", ""); // add custom scaling
 
               // video entity
               const videoEntity = document.createElement("a-video");
@@ -32,15 +34,36 @@
               container.appendChild(videoEntity);
               sceneEl.appendChild(container);
 
-              // start video
               vid.play();
               spawned = true;
             }
           });
 
-          // markerLost doesn’t remove or pause video
           marker.addEventListener("markerLost", () => {
             // do nothing → video persists
+          });
+        },
+      });
+
+      // custom scaling component
+      AFRAME.registerComponent("scalable", {
+        init: function () {
+          this.scaleFactor = 1;
+          this.handleScale = this.handleScale.bind(this);
+        },
+        play: function () {
+          this.el.sceneEl.addEventListener("twofingermove", this.handleScale);
+        },
+        pause: function () {
+          this.el.sceneEl.removeEventListener("twofingermove", this.handleScale);
+        },
+        handleScale: function (event) {
+          this.scaleFactor *= event.detail.scaleChange;
+          this.scaleFactor = Math.min(Math.max(this.scaleFactor, 0.5), 3); // clamp
+          this.el.setAttribute("scale", {
+            x: this.scaleFactor,
+            y: this.scaleFactor,
+            z: this.scaleFactor,
           });
         },
       });
