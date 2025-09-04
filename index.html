@@ -1,110 +1,60 @@
 <!doctype html>
 <html>
-  <head>
+
+<head>
     <script src="https://aframe.io/releases/1.0.4/aframe.min.js"></script>
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
     <script src="https://raw.githack.com/AR-js-org/studio-backend/master/src/modules/marker/tools/gesture-detector.js"></script>
     <script src="https://raw.githack.com/AR-js-org/studio-backend/master/src/modules/marker/tools/gesture-handler.js"></script>
-
     <script>
-      // spawns video when marker is first seen
-      AFRAME.registerComponent("videospawner", {
-        init: function () {
-          const marker = this.el;
-          const sceneEl = document.querySelector("a-scene");
-          const vid = document.querySelector("#vid");
-          let spawned = false;
+        // --- MODIFIED SCRIPT ---
+        AFRAME.registerComponent('videohandler', {
+            init: function() {
+                // Get the necessary elements
+                this.marker = this.el;
+                this.videoEntity = document.querySelector("#ar-video");
+                this.vid = document.querySelector("#vid");
+                this.isPlaced = false; // A flag to check if the video has been placed
 
-          marker.addEventListener("markerFound", () => {
-            if (!spawned) {
-              // container to hold video and allow gestures
-              const container = document.createElement("a-entity");
-              container.setAttribute("id", "videoContainer");
-              container.setAttribute("gesture-handler", "");
-              container.setAttribute("scalable", ""); // add custom scaling
+                // Marker is found
+                this.marker.addEventListener('markerFound', () => {
+                    // Check if the video has already been placed in the world
+                    if (!this.isPlaced) {
+                        this.isPlaced = true; // Set the flag to true
 
-              // video entity
-              const videoEntity = document.createElement("a-video");
-              videoEntity.setAttribute("src", "#vid");
-              videoEntity.setAttribute("scale", "1 1 1");
-              videoEntity.setAttribute("position", "0 0 -2");
-              videoEntity.setAttribute("rotation", "0 0 0");
-              videoEntity.setAttribute("class", "clickable");
+                        // Make the video entity visible
+                        this.videoEntity.setAttribute('visible', 'true');
 
-              container.appendChild(videoEntity);
-              sceneEl.appendChild(container);
+                        // Play the video
+                        this.vid.play();
+                    }
+                });
 
-              vid.play();
-              spawned = true;
-            }
-          });
-
-          marker.addEventListener("markerLost", () => {
-            // do nothing → video persists
-          });
-        },
-      });
-
-      // custom scaling component
-      AFRAME.registerComponent("scalable", {
-        init: function () {
-          this.scaleFactor = 1;
-          this.handleScale = this.handleScale.bind(this);
-        },
-        play: function () {
-          this.el.sceneEl.addEventListener("twofingermove", this.handleScale);
-        },
-        pause: function () {
-          this.el.sceneEl.removeEventListener("twofingermove", this.handleScale);
-        },
-        handleScale: function (event) {
-          this.scaleFactor *= event.detail.scaleChange;
-          this.scaleFactor = Math.min(Math.max(this.scaleFactor, 0.5), 3); // clamp
-          this.el.setAttribute("scale", {
-            x: this.scaleFactor,
-            y: this.scaleFactor,
-            z: this.scaleFactor,
-          });
-        },
-      });
+                // We no longer need a 'markerLost' listener, 
+                // so the video will not pause when the marker is gone.
+            },
+        });
     </script>
-  </head>
+</head>
 
-  <body style="margin: 0; overflow: hidden;">
-    <a-scene
-      vr-mode-ui="enabled: false"
-      loading-screen="enabled: false;"
-      arjs="sourceType: webcam; debugUIEnabled: false;"
-      id="scene"
-      embedded
-      gesture-detector
-    >
-      <a-assets>
-        <video
-          id="vid"
-          src="assets/asset.mp4"
-          preload="auto"
-          loop
-          crossorigin
-          webkit-playsinline
-          autoplay
-          muted
-          playsinline
-        ></video>
-      </a-assets>
+<body style="margin: 0; overflow: hidden;">
+    <a-scene vr-mode-ui="enabled: false" loading-screen="enabled: false;"
+        arjs='sourceType: webcam; debugUIEnabled: false;' id="scene" embedded gesture-detector>
 
-      <!-- marker just acts as a trigger -->
-      <a-marker
-        type="pattern"
-        preset="custom"
-        url="assets/marker.patt"
-        videospawner
-        emitevents="true"
-        id="markerA"
-      >
-      </a-marker>
+        <a-assets>
+            <video id="vid" src="assets/asset.mp4" preload="auto" response-type="arraybuffer" loop crossorigin
+                webkit-playsinline autoplay muted playsinline></video>
+        </a-assets>
 
-      <a-entity camera></a-entity>
+        <a-marker type="pattern" preset="custom" url="assets/marker.patt" videohandler smooth="true" smoothCount="10"
+            smoothTolerance="0.01" smoothThreshold="5">
+            </a-marker>
+
+        <a-video id="ar-video" src="#vid" scale="1 1 1" position="0 0.1 0" rotation="-90 0 0" class="clickable"
+            gesture-handler visible="false"></a-video>
+
+        <a-entity camera></a-entity>
     </a-scene>
-  </body>
+</body>
+
 </html>
