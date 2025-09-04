@@ -4,32 +4,24 @@
 <head>
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.5/aframe/build/aframe-ar.js"></script>
-
     <script src="https://raw.githack.com/AR-js-org/studio-backend/master/src/modules/marker/tools/gesture-detector.js"></script>
     <script src="https://raw.githack.com/AR-js-org/studio-backend/master/src/modules/marker/tools/gesture-handler.js"></script>
     
     <script>
-        // This JavaScript logic is correct and remains unchanged
+        // --- KEY CHANGE: Simplified JavaScript ---
+        // This script now only makes the video visible and plays it.
+        // It no longer needs to calculate any positions.
         AFRAME.registerComponent('scene-manager', {
             init: function() {
                 this.marker = document.querySelector("a-marker");
                 this.videoEntity = document.querySelector("#ar-video");
                 this.vid = document.querySelector("#vid");
-                this.camera = document.querySelector("[camera]");
                 this.isPlaced = false;
 
                 this.marker.addEventListener('markerFound', () => {
                     if (!this.isPlaced) {
                         this.isPlaced = true;
-                        const markerPosition = new THREE.Vector3();
-                        this.marker.object3D.getWorldPosition(markerPosition);
-                        this.videoEntity.setAttribute('position', markerPosition);
-                        const cameraPosition = new THREE.Vector3();
-                        this.camera.object3D.getWorldPosition(cameraPosition);
-                        this.videoEntity.setAttribute('look-at', cameraPosition);
-                        setTimeout(() => {
-                           this.videoEntity.removeAttribute('look-at');
-                        }, 100);
+                        // Simply make the video visible and play it.
                         this.videoEntity.setAttribute('visible', 'true');
                         this.vid.play();
                     }
@@ -42,7 +34,7 @@
 <body style="margin: 0; overflow: hidden;">
     
     <a-scene vr-mode-ui="enabled: false" loading-screen="enabled: false;"
-        arjs='sourceType: webcam; trackingMethod: best; debugUIEnabled: true;' 
+        arjs='sourceType: webcam; trackingMethod: best; debugUIEnabled: false;' 
         id="scene" embedded gesture-detector scene-manager>
 
         <a-assets>
@@ -52,10 +44,12 @@
         
         <a-marker type="pattern" preset="custom" url="assets/marker.patt"></a-marker>
         
-        <a-video id="ar-video" src="#vid" scale="1 1 1" position="0 0 0" rotation="0 0 0" class="clickable"
-            gesture-handler visible="false"></a-video>
-        
-        <a-entity camera cursor="rayOrigin: mouse" raycaster="objects: .clickable"></a-entity>
+        <a-entity camera cursor="rayOrigin: mouse" raycaster="objects: .clickable">
+
+            <a-video id="ar-video" src="#vid" scale="0.8 0.8 0.8" position="0 0 -2" rotation="0 0 0" class="clickable"
+                gesture-handler visible="false"></a-video>
+
+        </a-entity>
 
     </a-scene>
 </body>
