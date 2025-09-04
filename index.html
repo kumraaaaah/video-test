@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>AR marker → persistent video w/ gestures</title>
+    <title>AR marker → persistent video w/ gestures (fixed scale)</title>
 
     <!-- A-Frame -->
     <script src="https://aframe.io/releases/1.0.4/aframe.min.js"></script>
@@ -11,10 +11,10 @@
     <!-- AR.js A-Frame build -->
     <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/aframe/build/aframe-ar.js"></script>
 
-    <!-- gesture-detector (emits onefingermove / twofingermove etc) -->
+    <!-- gesture-detector (emits onefinger*/twofinger* events for touch) -->
     <script src="https://raw.githack.com/AR-js-org/studio-backend/master/src/modules/marker/tools/gesture-detector.js"></script>
 
-    <!-- CUSTOM gesture handler (robust: single-finger rotate, two-finger pinch scale + rotate) -->
+    <!-- custom gesture handler (robust) -->
     <script>
       (function () {
         AFRAME.registerComponent("custom-gesture-handler", {
@@ -22,11 +22,10 @@
             enabled: { type: "boolean", default: true },
             minScale: { type: "number", default: 0.3 },
             maxScale: { type: "number", default: 5 },
-            rotateSensitivity: { type: "number", default: 0.6 } // tweak to taste
+            rotateSensitivity: { type: "number", default: 0.6 }
           },
 
           init: function () {
-            // state
             this.sceneEl = this.el.sceneEl || document.querySelector("a-scene");
             this._onOneStart = this._onOneStart.bind(this);
             this._onOneMove = this._onOneMove.bind(this);
@@ -38,14 +37,15 @@
             this.isOne = false;
             this.isTwo = false;
 
-            // sensible defaults from current transform
-            const s = this.el.object3D.scale;
+            const s = this.el.object3D && this.el.object3D.scale ? this.el.object3D.scale : null;
             this.currentScale = s ? s.x : 1;
             this.startSpread = null;
             this.startAngle = null;
+            this.startScale = this.currentScale;
             this.startRotationYDeg = this._getRotationYDeg();
 
             this.lastOneX = null;
+            this.oneStartRotY = this._getRotationYDeg();
           },
 
           play: function () {
@@ -64,216 +64,4 @@
             this.sceneEl.removeEventListener("onefingermove", this._onOneMove);
             this.sceneEl.removeEventListener("onefingerend", this._onOneEnd);
             this.sceneEl.removeEventListener("twofingerstart", this._onTwoStart);
-            this.sceneEl.removeEventListener("twofingermove", this._onTwoMove);
-            this.sceneEl.removeEventListener("twofingerend", this._onTwoEnd);
-          },
-
-          // Helpers to read various possible event payloads
-          _getPos: function (detail) {
-            if (!detail) return { x: 0, y: 0 };
-            if (detail.position) return { x: detail.position.x, y: detail.position.y };
-            if (typeof detail.x !== "undefined" && typeof detail.y !== "undefined") return { x: detail.x, y: detail.y };
-            if (typeof detail.clientX !== "undefined" && typeof detail.clientY !== "undefined") return { x: detail.clientX, y: detail.clientY };
-            return { x: 0, y: 0 };
-          },
-
-          _getSpread: function (detail) {
-            // gesture-detector variations: spread / spreadDistance / distance / scale
-            if (!detail) return null;
-            return detail.spread || detail.spreadDistance || detail.distance || detail.scale || detail.scaleChange || null;
-          },
-
-          _getAngle: function (detail) {
-            // rotation / angle / rotationChange / angleChange
-            if (!detail) return 0;
-            return detail.rotation || detail.angle || detail.rotationChange || detail.angleChange || 0;
-          },
-
-          _getRotationYDeg: function () {
-            const r = this.el.object3D.rotation ? this.el.object3D.rotation.y : 0;
-            return (r * 180) / Math.PI;
-          },
-
-          _setRotationYDeg: function (deg) {
-            const rad = (deg * Math.PI) / 180;
-            this.el.object3D.rotation.set(0, rad, 0);
-          },
-
-          // single-finger handlers -> rotate by horizontal finger movement
-          _onOneStart: function (evt) {
-            if (!this.data.enabled) return;
-            this.isOne = true;
-            const pos = this._getPos(evt && evt.detail);
-            this.lastOneX = pos.x;
-            // keep current rotation baseline
-            this.oneStartRotY = this._getRotationYDeg();
-          },
-
-          _onOneMove: function (evt) {
-            if (!this.data.enabled || !this.isOne) return;
-            const pos = this._getPos(evt && evt.detail);
-            if (this.lastOneX === null) {
-              this.lastOneX = pos.x;
-              return;
-            }
-            const dx = pos.x - this.lastOneX;
-            this.lastOneX = pos.x;
-            // dx is in screen pixels — scale it down to feel natural
-            const screenFactor = (dx / (window.innerWidth || 360)) * 360; // normalize a little
-            const deltaDeg = -screenFactor * this.data.rotateSensitivity; // invert for natural feel
-            const newDeg = this.oneStartRotY + deltaDeg;
-            this._setRotationYDeg(newDeg);
-          },
-
-          _onOneEnd: function () {
-            this.isOne = false;
-            this.lastOneX = null;
-          },
-
-          // two-finger handlers -> pinch-scale and two-finger rotate
-          _onTwoStart: function (evt) {
-            if (!this.data.enabled) return;
-            this.isTwo = true;
-            const d = evt && evt.detail ? evt.detail : {};
-            this.startSpread = this._getSpread(d) || 1;
-            this.startAngle = this._getAngle(d) || 0;
-            // record baseline scale and rotation
-            this.startScale = this.currentScale = (this.el.object3D.scale && this.el.object3D.scale.x) ? this.el.object3D.scale.x : 1;
-            this.startRotationYDeg = this._getRotationYDeg();
-          },
-
-          _onTwoMove: function (evt) {
-            if (!this.data.enabled || !this.isTwo) return;
-            const d = evt && evt.detail ? evt.detail : {};
-            // SCALE
-            const spreadNow = this._getSpread(d);
-            if (spreadNow && this.startSpread && this.startSpread > 0) {
-              let newScale = this.startScale * (spreadNow / this.startSpread);
-              newScale = Math.max(this.data.minScale, Math.min(this.data.maxScale, newScale));
-              this.currentScale = newScale;
-              this.el.object3D.scale.set(newScale, newScale, newScale);
-            }
-
-            // ROTATION (two-finger rotate around Y)
-            const angleNow = this._getAngle(d);
-            if (typeof angleNow !== "undefined" && this.startAngle !== null) {
-              const angleDelta = angleNow - this.startAngle; // degrees
-              // invert to feel natural
-              const newDeg = this.startRotationYDeg - angleDelta;
-              this._setRotationYDeg(newDeg);
-            }
-          },
-
-          _onTwoEnd: function () {
-            this.isTwo = false;
-            this.startSpread = null;
-            this.startAngle = null;
-          },
-        });
-      })();
-    </script>
-
-    <!-- videohandler (spawns, removes old, resets playback) -->
-    <script>
-      (function () {
-        AFRAME.registerComponent("videohandler", {
-          init: function () {
-            const marker = this.el;
-            this.vid = document.querySelector("#vid");
-            const sceneEl = document.querySelector("a-scene");
-
-            marker.addEventListener("markerFound", async () => {
-              try {
-                // remove previous spawn (if any) so rescanning starts fresh
-                const old = document.querySelector("#videoContainer");
-                if (old) {
-                  try { old.parentNode.removeChild(old); } catch (e) {}
-                }
-
-                // reset and play video from start
-                try {
-                  this.vid.pause();
-                  this.vid.currentTime = 0;
-                } catch (e) {
-                  console.warn("Couldn't reset video currentTime:", e);
-                }
-
-                // wrapper entity (will be manipulated)
-                const container = document.createElement("a-entity");
-                container.setAttribute("id", "videoContainer");
-                container.setAttribute("position", "0 0 -2"); // spawn in front of camera
-                container.setAttribute("custom-gesture-handler", ""); // attach gestures
-
-                // the video plane
-                const videoEntity = document.createElement("a-video");
-                videoEntity.setAttribute("src", "#vid");
-                videoEntity.setAttribute("scale", "1 1 1");
-                // plane rotation to face camera - tweak if your video appears rotated
-                videoEntity.setAttribute("rotation", " -90 0 0");
-                videoEntity.setAttribute("position", "0 0 0");
-                videoEntity.setAttribute("class", "clickable");
-
-                container.appendChild(videoEntity);
-                sceneEl.appendChild(container);
-
-                // attempt to play (muted autoplay should work)
-                try {
-                  await this.vid.play();
-                } catch (e) {
-                  console.warn("Video play() blocked by autoplay policy; interact to start.", e);
-                }
-              } catch (err) {
-                console.error("videohandler markerFound error", err);
-              }
-            });
-
-            marker.addEventListener("markerLost", () => {
-              // your current preference: keep the spawned video persistent in world.
-              // if you want it to be removed when marker is lost, uncomment next lines:
-              // const spawned = document.querySelector("#videoContainer");
-              // if (spawned) spawned.parentNode.removeChild(spawned);
-            });
-          },
-        });
-      })();
-    </script>
-  </head>
-
-  <body style="margin: 0; overflow: hidden;">
-    <a-scene
-      vr-mode-ui="enabled: false"
-      loading-screen="enabled: false;"
-      arjs="sourceType: webcam; debugUIEnabled: false;"
-      id="scene"
-      embedded
-      gesture-detector
-    >
-      <a-assets>
-        <video
-          id="vid"
-          src="assets/asset.mp4"
-          preload="auto"
-          loop="false"
-          crossorigin
-          webkit-playsinline
-          autoplay
-          muted
-          playsinline
-        ></video>
-      </a-assets>
-
-      <!-- marker -->
-      <a-marker
-        type="pattern"
-        preset="custom"
-        url="assets/marker.patt"
-        videohandler
-        emitevents="true"
-        id="markerA"
-      >
-      </a-marker>
-
-      <a-entity camera></a-entity>
-    </a-scene>
-  </body>
-</html>
+            this.sceneEl.removeEventListener("two
