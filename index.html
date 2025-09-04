@@ -6,122 +6,62 @@
     <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.5/aframe/build/aframe-ar.js"></script>
     
     <script>
-        // --- THIS SCRIPT TRIGGERS THE VIDEO TO APPEAR ---
+        // --- SCRIPT TO TRIGGER THE CAROUSEL TO APPEAR ---
         AFRAME.registerComponent('scene-manager', {
             init: function() {
                 this.marker = document.querySelector("a-marker");
-                this.videoEntity = document.querySelector("#ar-video");
-                this.vid = document.querySelector("#vid");
-                this.isPlaced = false;
+                // The rig is the parent group for the video and buttons
+                this.carouselRig = document.querySelector("#carousel-rig");
 
                 this.marker.addEventListener('markerFound', () => {
-                    if (!this.isPlaced) {
-                        this.isPlaced = true;
-                        this.videoEntity.setAttribute('visible', 'true');
-                        this.vid.play();
-                    }
+                    // This now makes the entire carousel visible at once
+                    this.carouselRig.setAttribute('visible', 'true');
                 });
             }
         });
 
-        // --- UPDATED SCRIPT FOR 2D and 3D MANIPULATION ---
-        AFRAME.registerComponent('screen-manipulator', {
+        // --- NEW SCRIPT TO MANAGE THE VIDEO CAROUSEL ---
+        AFRAME.registerComponent('video-carousel', {
             init: function () {
-                this.target = this.el.object3D;
-                this.canvas = this.el.sceneEl.canvas;
+                // --- ADD YOUR VIDEO URLS HERE ---
+                this.videoSources = [
+                    'assets/asset.mp4',
+                    'https://cdn.glitch.global/c36aa182-16e5-4191-9a7c-12b203fb7d7c/jellyfish.mp4?v=1725528854483',
+                    'https://cdn.glitch.global/c36aa182-16e5-4191-9a7c-12b203fb7d7c/flow.mp4?v=1725528860074'
+                    // Add as many video URLs as you want
+                ];
 
-                this.touchState = {
-                    isOneFingerRotating: false,
-                    isTwoFingerManipulating: false,
-                    startDist: 0,
-                    startAngle: 0,
-                    startScale: new THREE.Vector3(),
-                    startRotation: new THREE.Euler(),
-                    lastPanPos: { x: 0, y: 0 },
-                    lastRotatePos: { x: 0, y: 0 }
-                };
+                this.currentIndex = 0;
+                this.videoAsset = document.querySelector("#vid");
+                this.nextButton = document.querySelector("#next-button");
+                this.prevButton = document.querySelector("#prev-button");
 
-                // Bind event listeners
-                this.onTouchStart = this.onTouchStart.bind(this);
-                this.onTouchMove = this.onTouchMove.bind(this);
-                this.onTouchEnd = this.onTouchEnd.bind(this);
+                // Set the initial video
+                this.videoAsset.setAttribute('src', this.videoSources[this.currentIndex]);
 
-                this.canvas.addEventListener('touchstart', this.onTouchStart);
-                this.canvas.addEventListener('touchend', this.onTouchEnd);
+                this.nextButton.addEventListener('click', () => {
+                    this.currentIndex = (this.currentIndex + 1) % this.videoSources.length; // Loop forward
+                    this.loadVideo();
+                });
+
+                this.prevButton.addEventListener('click', () => {
+                    this.currentIndex = (this.currentIndex - 1 + this.videoSources.length) % this.videoSources.length; // Loop backward
+                    this.loadVideo();
+                });
             },
 
-            onTouchStart: function (e) {
-                if (e.touches.length === 1) {
-                    this.touchState.isOneFingerRotating = true;
-                    this.touchState.lastRotatePos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-                } else if (e.touches.length === 2) {
-                    this.touchState.isTwoFingerManipulating = true;
-                    const t0 = e.touches[0];
-                    const t1 = e.touches[1];
-                    const dx = t0.clientX - t1.clientX;
-                    const dy = t0.clientY - t1.clientY;
-
-                    // For Pinch/Twist
-                    this.touchState.startDist = Math.sqrt(dx * dx + dy * dy);
-                    this.touchState.startAngle = Math.atan2(dy, dx);
-                    this.touchState.startScale.copy(this.target.scale);
-                    this.touchState.startRotation.copy(this.target.rotation);
-
-                    // For Pan
-                    this.touchState.lastPanPos = { 
-                        x: (t0.clientX + t1.clientX) / 2,
-                        y: (t0.clientY + t1.clientY) / 2
-                    };
-                }
-                this.canvas.addEventListener('touchmove', this.onTouchMove);
-            },
-
-            onTouchMove: function (e) {
-                // --- NEW: One-finger drag for 3D rotation ---
-                if (this.touchState.isOneFingerRotating && e.touches.length === 1) {
-                    const currentPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-                    const deltaX = currentPos.x - this.touchState.lastRotatePos.x;
-                    const deltaY = currentPos.y - this.touchState.lastRotatePos.y;
-                    const sensitivity = 0.01;
-
-                    this.target.rotation.y += deltaX * sensitivity;
-                    this.target.rotation.x += deltaY * sensitivity;
-
-                    this.touchState.lastRotatePos = currentPos;
-                }
-                
-                // --- MODIFIED: Two-finger gestures for Pan, Pinch, and 2D Twist ---
-                if (this.touchState.isTwoFingerManipulating && e.touches.length === 2) {
-                    const t0 = e.touches[0];
-                    const t1 = e.touches[1];
-                    const dx = t0.clientX - t1.clientX;
-                    const dy = t0.clientY - t1.clientY;
-
-                    // Pan (Move) logic
-                    const currentPanPos = { x: (t0.clientX + t1.clientX) / 2, y: (t0.clientY + t1.clientY) / 2 };
-                    const panDeltaX = currentPanPos.x - this.touchState.lastPanPos.x;
-                    const panDeltaY = currentPanPos.y - this.touchState.lastPanPos.y;
-                    const panSensitivity = 0.005;
-                    this.target.position.x += panDeltaX * panSensitivity;
-                    this.target.position.y -= panDeltaY * panSensitivity;
-                    this.touchState.lastPanPos = currentPanPos;
-
-                    // Pinch (Scale) and Twist (2D Rotate) logic
-                    const currentDist = Math.sqrt(dx * dx + dy * dy);
-                    const scaleFactor = currentDist / this.touchState.startDist;
-                    this.target.scale.copy(this.touchState.startScale).multiplyScalar(scaleFactor);
-
-                    const currentAngle = Math.atan2(dy, dx);
-                    const deltaAngle = currentAngle - this.touchState.startAngle;
-                    this.target.rotation.z = this.touchState.startRotation.z - deltaAngle;
-                }
-            },
-
-            onTouchEnd: function (e) {
-                this.touchState.isOneFingerRotating = false;
-                this.touchState.isTwoFingerManipulating = false;
-                this.canvas.removeEventListener('touchmove', this.onTouchMove);
+            loadVideo: function () {
+                this.videoAsset.setAttribute('src', this.videoSources[this.currentIndex]);
+                this.videoAsset.load(); // Important: load the new source
+                this.videoAsset.play(); // Play the new video
             }
+        });
+
+        // --- CUSTOM SCRIPT FOR MANIPULATION (Unchanged) ---
+        AFRAME.registerComponent('screen-manipulator', {
+            init: function () { /* ... Omitted for brevity, this code is unchanged ... */
+                this.target=this.el.object3D;this.canvas=this.el.sceneEl.canvas;this.touchState={isOneFingerRotating:!1,isTwoFingerManipulating:!1,startDist:0,startAngle:0,startScale:new THREE.Vector3,startRotation:new THREE.Euler,lastPanPos:{x:0,y:0},lastRotatePos:{x:0,y:0}};this.onTouchStart=this.onTouchStart.bind(this);this.onTouchMove=this.onTouchMove.bind(this);this.onTouchEnd=this.onTouchEnd.bind(this);this.canvas.addEventListener("touchstart",this.onTouchStart);this.canvas.addEventListener("touchend",this.onTouchEnd)
+            }, onTouchStart:function(e){1===e.touches.length?(this.touchState.isOneFingerRotating=!0,this.touchState.lastRotatePos={x:e.touches[0].clientX,y:e.touches[0].clientY}):2===e.touches.length&&(this.touchState.isTwoFingerManipulating=!0,t0=e.touches[0],t1=e.touches[1],dx=t0.clientX-t1.clientX,dy=t0.clientY-t1.clientY,this.touchState.startDist=Math.sqrt(dx*dx+dy*dy),this.touchState.startAngle=Math.atan2(dy,dx),this.touchState.startScale.copy(this.target.scale),this.touchState.startRotation.copy(this.target.rotation),this.touchState.lastPanPos={x:(t0.clientX+t1.clientX)/2,y:(t0.clientY+t1.clientY)/2});this.canvas.addEventListener("touchmove",this.onTouchMove)},onTouchMove:function(e){if(this.touchState.isOneFingerRotating&&1===e.touches.length){const t={x:e.touches[0].clientX,y:e.touches[0].clientY},i=t.x-this.touchState.lastRotatePos.x,s=t.y-this.touchState.lastRotatePos.y;this.target.rotation.y+=.01*i,this.target.rotation.x+=.01*s,this.touchState.lastRotatePos=t}if(this.touchState.isTwoFingerManipulating&&2===e.touches.length){const t=e.touches[0],i=e.touches[1],s=t.clientX-i.clientX,a=t.clientY-i.clientY,o={x:(t.clientX+i.clientX)/2,y:(t.clientY+i.clientY)/2},n=o.x-this.touchState.lastPanPos.x,h=o.y-this.touchState.lastPanPos.y;this.target.position.x+=.005*n,this.target.position.y-=.005*h,this.touchState.lastPanPos=o;const c=Math.sqrt(s*s+a*a),r=c/this.touchState.startDist;this.target.scale.copy(this.touchState.startScale).multiplyScalar(r);const l=Math.atan2(a,s),d=l-this.touchState.startAngle;this.target.rotation.z=this.touchState.startRotation.z-d}},onTouchEnd:function(e){this.touchState.isOneFingerRotating=!1,this.touchState.isTwoFingerManipulating=!1,this.canvas.removeEventListener("touchmove",this.onTouchMove)}
         });
     </script>
 </head>
@@ -133,15 +73,29 @@
         id="scene" embedded scene-manager>
 
         <a-assets>
-            <video id="vid" src="assets/asset.mp4" preload="auto" response-type="arraybuffer" loop crossorigin
+            <video id="vid" preload="auto" response-type="arraybuffer" loop crossorigin
                 webkit-playsinline autoplay muted playsinline></video>
         </a-assets>
         
         <a-marker type="pattern" preset="custom" url="assets/marker.patt"></a-marker>
         
-        <a-entity camera>
-            <a-video id="ar-video" src="#vid" scale="0.8 0.8 0.8" position="0 0 -2" rotation="0 0 0" 
-                screen-manipulator visible="false"></a-video>
+        <a-entity camera raycaster="objects: .clickable, [screen-manipulator];">
+            
+            <a-entity id="carousel-rig" video-carousel visible="false">
+                
+                <a-video id="ar-video" src="#vid" scale="0.8 0.8 0.8" position="0 0 -2" rotation="0 0 0" 
+                    screen-manipulator></a-video>
+
+                <a-plane id="next-button" class="clickable" color="#222" height="0.2" width="0.2" position="0.6 0 -2" opacity="0.6">
+                    <a-text value=">" align="center" color="white" width="2"></a-text>
+                </a-plane>
+
+                <a-plane id="prev-button" class="clickable" color="#222" height="0.2" width="0.2" position="-0.6 0 -2" opacity="0.6">
+                    <a-text value="<" align="center" color="white" width="2"></a-text>
+                </a-plane>
+
+            </a-entity>
+
         </a-entity>
 
     </a-scene>
