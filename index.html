@@ -1,46 +1,263 @@
-<head>
-  <script src="https://aframe.io/releases/1.0.4/aframe.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/aframe/build/aframe-ar.js"></script>
-  <!-- must be loaded so gestures fire -->
-  <script src="https://raw.githack.com/AR-js-org/studio-backend/master/src/modules/marker/tools/gesture-detector.js"></script>
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>AR video — marker trigger (life-size)</title>
 
-  <!-- custom handler -->
-  <script>
-    AFRAME.registerComponent("custom-gesture-handler", {
-      schema: { enabled: { default: true } },
-      init: function () {
-        this.handleScale = this.handleScale.bind(this);
-        this.handleRotation = this.handleRotation.bind(this);
-        this.scaleFactor = 1;
-        this.rotationFactor = 0;
-      },
-      handleScale: function (event) {
-        if (!this.data.enabled) return;
-        this.scaleFactor *= event.detail.scaleChange;
-        this.scaleFactor = Math.min(Math.max(this.scaleFactor, 0.5), 3);
-        this.el.setAttribute("scale", {
-          x: this.scaleFactor,
-          y: this.scaleFactor,
-          z: this.scaleFactor,
-        });
-      },
-      handleRotation: function (event) {
-        if (!this.data.enabled) return;
-        this.rotationFactor += -event.detail.angleChange;
-        this.el.setAttribute("rotation", {
-          x: 0,
-          y: this.rotationFactor,
-          z: 0,
-        });
-      },
-      play: function () {
-        this.el.sceneEl.addEventListener("onefingermove", this.handleRotation);
-        this.el.sceneEl.addEventListener("twofingermove", this.handleScale);
-      },
-      pause: function () {
-        this.el.sceneEl.removeEventListener("onefingermove", this.handleRotation);
-        this.el.sceneEl.removeEventListener("twofingermove", this.handleScale);
-      },
-    });
-  </script>
-</head>
+    <!-- A-Frame first -->
+    <script src="https://aframe.io/releases/1.0.4/aframe.min.js"></script>
+
+    <!-- AR.js (A-Frame build) -->
+    <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/aframe/build/aframe-ar.js"></script>
+
+    <!-- gesture-detector (emits onefingermove / twofingermove events) -->
+    <script src="https://raw.githack.com/AR-js-org/studio-backend/master/src/modules/marker/tools/gesture-detector.js"></script>
+
+    <!-- custom gesture handler (safe; won't throw on missing details) -->
+    <script>
+      (function () {
+        try {
+          AFRAME.registerComponent("custom-gesture-handler", {
+            schema: { enabled: { default: true } },
+
+            init: function () {
+              this._onOneFingerMove = this._onOneFingerMove.bind(this);
+              this._onTwoFingerMove = this._onTwoFingerMove.bind(this);
+
+              this.scaleFactor = 1;
+              this.rotationY = 0;
+
+              // store ref to the scene for play/pause
+              this.sceneEl = this.el.sceneEl || document.querySelector("a-scene");
+            },
+
+            play: function () {
+              if (!this.sceneEl) return;
+              // listen to the events emitted by gesture-detector
+              this.sceneEl.addEventListener("onefingermove", this._onOneFingerMove);
+              this.sceneEl.addEventListener("twofingermove", this._onTwoFingerMove);
+            },
+
+            pause: function () {
+              if (!this.sceneEl) return;
+              this.sceneEl.removeEventListener("onefingermove", this._onOneFingerMove);
+              this.sceneEl.removeEventListener("twofingermove", this._onTwoFingerMove);
+            },
+
+            _onTwoFingerMove: function (evt) {
+              try {
+                if (!this.data.enabled) return;
+                const d = evt && evt.detail ? evt.detail : {};
+                // gesture-detector uses scaleChange in its events; fallback to scale
+                const scaleChange = d.scaleChange || d.scale || 1;
+                // clamp and smooth scaling for a natural feel
+                this.scaleFactor *= scaleChange;
+                this.scaleFactor = Math.min(Math.max(this.scaleFactor, 0.3), 5);
+                // apply scale directly to object3D for best performance
+                this.el.object3D.scale.set(this.scaleFactor, this.scaleFactor, this.scaleFactor);
+              } catch (e) {
+                console.error("custom-gesture-handler: scale error", e);
+              }
+            },
+
+            _onOneFingerMove: function (evt) {
+              try {
+                if (!this.data.enabled) return;
+                const d = evt && evt.detail ? evt.detail : {};
+                // gesture-detector uses angleChange; fallback to angle
+                const angleChange = d.angleChange || d.angle || 0;
+                // invert rotation to feel natural for swipe direction
+                this.rotationY -= angleChange;
+                // convert degrees to radians and set rotation
+                if (window.THREE && window.THREE.MathUtils) {
+                  this.el.object3D.rotation.set(0, THREE.MathUtils.degToRad(this.rotationY), 0);
+                } else {
+                  // fallback if THREE isn't available for some reason
+                  this.el.object3D.rotation.y = (this.rotationY * Math.PI) / 180;
+                }
+              } catch (e) {
+                console.error("custom-gesture-handler: rotation error", e);
+              }
+            },
+          });
+        } catch (err) {
+          // registering component failed — don't let this stop the scene
+          console.error("Failed to register custom-gesture-handler:", err);
+        }
+      })();
+    </script>
+
+    <!-- videohandler component: spawns/removes the life-sized video and controls playback -->
+    <script>
+      (function () {
+        try {
+          AFRAME.registerComponent("videohandler", {
+            init: function () {
+              const marker = this.el;
+              const sceneEl = this.el.sceneEl || document.querySelector("a-scene");
+              const vid = document.querySelector("#vid");
+              let currentContainer = null;
+
+              // helper to ensure video metadata is loaded so we can compute aspect ratio
+              function ensureVideoReady(video) {
+                return new Promise((resolve) => {
+                  if (!video) return resolve();
+                  if (video.readyState >= 2 && video.videoWidth && video.videoHeight) {
+                    return resolve();
+                  }
+                  const onCanPlay = function () {
+                    video.removeEventListener("loadedmetadata", onCanPlay);
+                    video.removeEventListener("canplay", onCanPlay);
+                    resolve();
+                  };
+                  video.addEventListener("loadedmetadata", onCanPlay);
+                  video.addEventListener("canplay", onCanPlay);
+                  // fallback resolution in 2s if events don't fire
+                  setTimeout(resolve, 2000);
+                });
+              }
+
+              marker.addEventListener("markerFound", async () => {
+                try {
+                  // remove old container (so rescanning spawns fresh entity from start)
+                  if (currentContainer) {
+                    try {
+                      sceneEl.removeChild(currentContainer);
+                    } catch (e) {
+                      /* ignore */
+                    }
+                    currentContainer = null;
+                  }
+
+                  // ensure video dimensions available
+                  await ensureVideoReady(vid);
+
+                  // reset playback
+                  try {
+                    vid.pause();
+                    vid.currentTime = 0;
+                  } catch (e) {
+                    console.warn("Could not reset video currentTime:", e);
+                  }
+
+                  // create wrapper (this will carry gesture handler)
+                  const container = document.createElement("a-entity");
+                  container.setAttribute("id", "spawned-video-wrapper");
+                  // start with a position in front of the camera (adjustable)
+                  container.setAttribute("position", "0 0 -2");
+                  // attach custom gesture handler so user can pinch/rotate
+                  container.setAttribute("custom-gesture-handler", "");
+
+                  // create the <a-video> element
+                  const videoEntity = document.createElement("a-video");
+                  videoEntity.setAttribute("src", "#vid");
+                  videoEntity.setAttribute("class", "clickable");
+
+                  // life-sized height ~ 1.73m (5'8")
+                  const desiredHeight = 1.73;
+
+                  // compute width from the real aspect ratio if available
+                  let aspect = 16 / 9;
+                  try {
+                    if (vid && vid.videoWidth && vid.videoHeight) {
+                      aspect = vid.videoWidth / vid.videoHeight;
+                    }
+                  } catch (e) {
+                    console.warn("Could not read video natural dimensions, using 16:9");
+                  }
+                  const computedWidth = desiredHeight * aspect;
+
+                  // set width/height so video is life-sized
+                  videoEntity.setAttribute("height", String(desiredHeight));
+                  videoEntity.setAttribute("width", String(computedWidth));
+
+                  // keep rotation so it faces user (flat plane)
+                  videoEntity.setAttribute("rotation", "-90 0 0"); 
+                  // note: some versions of a-video expect rotation -90 to face camera; tweak if needed.
+
+                  // append and play
+                  container.appendChild(videoEntity);
+                  sceneEl.appendChild(container);
+                  currentContainer = container;
+
+                  // attempt to play (muted autoplay should work)
+                  try {
+                    await vid.play();
+                  } catch (e) {
+                    // browsers sometimes require user interaction; warn to check console
+                    console.warn("Video play() failed (browser autoplay policy). Interact with the page to start playback.", e);
+                  }
+                } catch (err) {
+                  console.error("videohandler markerFound error:", err);
+                }
+              });
+
+              marker.addEventListener("markerLost", () => {
+                try {
+                  // pause video and remove the spawned entity so rescanning restarts it
+                  if (vid) {
+                    try {
+                      vid.pause();
+                    } catch (e) {
+                      /* ignore */
+                    }
+                  }
+                  if (currentContainer) {
+                    try {
+                      sceneEl.removeChild(currentContainer);
+                    } catch (e) {
+                      /* ignore */
+                    }
+                    currentContainer = null;
+                  }
+                } catch (err) {
+                  console.error("videohandler markerLost error:", err);
+                }
+              });
+            },
+          });
+        } catch (err) {
+          console.error("Failed to register videohandler:", err);
+        }
+      })();
+    </script>
+  </head>
+
+  <body style="margin:0; overflow:hidden;">
+    <a-scene
+      vr-mode-ui="enabled: false"
+      loading-screen="enabled: false"
+      arjs="sourceType: webcam; debugUIEnabled: false;"
+      embedded
+      id="scene"
+    >
+      <a-assets>
+        <!-- IMPORTANT: ensure this path is correct on your deploy -->
+        <video
+          id="vid"
+          src="assets/asset.mp4"
+          preload="auto"
+          crossorigin="anonymous"
+          webkit-playsinline
+          playsinline
+          muted
+          loop="false"
+        ></video>
+      </a-assets>
+
+      <!-- marker (only acts as trigger) -->
+      <a-marker
+        type="pattern"
+        preset="custom"
+        url="assets/marker.patt"
+        id="markerA"
+        videohandler
+        emitevents="true"
+      >
+      </a-marker>
+
+      <a-entity camera></a-entity>
+    </a-scene>
+  </body>
+</html>
