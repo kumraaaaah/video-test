@@ -20,17 +20,13 @@
             }
         });
 
-        // --- CORRECTED SCRIPT TO MANAGE THE VIDEO CAROUSEL ---
+        // --- SCRIPT TO MANAGE THE VIDEO CAROUSEL ---
         AFRAME.registerComponent('video-carousel', {
-            // The 'play' function is a safer place to find other elements and add listeners,
-            // as it runs after the scene has more reliably loaded all its parts.
             play: function () {
                 // --- PLEASE USE ONLY VIDEO FILES (like .mp4), NOT .gif files ---
                 this.videoSources = [
                     'assets/@KRSNAOfficial - No Cap (Live Performance Video)_2.mp4',
-                    // I've replaced your .gif with a placeholder .mp4. 
-                    // Please change this to your second VIDEO file.
-                    'assets/ezgif-512a1a0aa7266c.mp4' 
+                    'assets/ezgif-512a1a0aa7266c.mp4'
                 ];
 
                 this.currentIndex = 0;
@@ -38,24 +34,19 @@
                 this.nextButton = document.querySelector("#next-button");
                 this.prevButton = document.querySelector("#prev-button");
 
-                // Set the initial video source
                 this.videoAsset.setAttribute('src', this.videoSources[this.currentIndex]);
 
-                // Use .bind(this) to make sure 'this' refers to our component
                 this.nextButton.addEventListener('click', this.onNext.bind(this));
                 this.prevButton.addEventListener('click', this.onPrev.bind(this));
             },
-
             onNext: function () {
                 this.currentIndex = (this.currentIndex + 1) % this.videoSources.length;
                 this.loadVideo();
             },
-
             onPrev: function () {
                 this.currentIndex = (this.currentIndex - 1 + this.videoSources.length) % this.videoSources.length;
                 this.loadVideo();
             },
-
             loadVideo: function () {
                 this.videoAsset.setAttribute('src', this.videoSources[this.currentIndex]);
                 this.videoAsset.load();
@@ -63,13 +54,11 @@
             }
         });
 
-        // --- SCRIPT FOR MANIPULATION AND TAPPING (Unchanged) ---
+        // --- DEFINITIVELY CORRECTED SCRIPT FOR MANIPULATION AND TAPPING ---
         AFRAME.registerComponent('screen-manipulator', {
             init: function () {
                 this.target = this.el.object3D;
-                this.canvas = this.el.sceneEl.canvas;
                 this.videoAsset = document.querySelector("#vid");
-                this.raycaster = this.el.sceneEl.components.raycaster;
                 this.touchState = {
                     isOneFingerRotating: false, isTwoFingerManipulating: false,
                     startDist: 0, startAngle: 0, startScale: new THREE.Vector3(),
@@ -77,25 +66,33 @@
                     lastRotatePos: { x: 0, y: 0 }, touchStartTime: 0,
                     startTouchPos: { x: 0, y: 0 }
                 };
+
+                // Bind event listeners
                 this.onTouchStart = this.onTouchStart.bind(this);
                 this.onTouchMove = this.onTouchMove.bind(this);
                 this.onTouchEnd = this.onTouchEnd.bind(this);
-                this.canvas.addEventListener('touchstart', this.onTouchStart);
-                this.canvas.addEventListener('touchend', this.onTouchEnd);
+
+                // KEY CHANGE: Listen for touches directly on this entity (the video)
+                // This is enabled by the raycaster on the camera.
+                this.el.addEventListener('touchstart', this.onTouchStart);
+                this.el.sceneEl.addEventListener('touchmove', this.onTouchMove); // Move can happen anywhere on screen
+                this.el.sceneEl.addEventListener('touchend', this.onTouchEnd); // End can happen anywhere on screen
             },
             onTouchStart: function (e) {
-                const intersectedEls = this.raycaster ? this.raycaster.intersectedEls : [];
-                if (intersectedEls.some(el => el.classList.contains('clickable'))) {
-                    return; 
-                }
-                if (e.touches.length === 1) {
+                // We no longer need to check for buttons here, as this only fires
+                // when the touch starts directly on the video.
+                if (e.detail.intersectedEl !== this.el) return;
+
+                const touches = e.detail.event.touches;
+                if (touches.length === 1) {
                     this.touchState.isOneFingerRotating = true;
-                    this.touchState.lastRotatePos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+                    this.touchState.lastRotatePos = { x: touches[0].clientX, y: touches[0].clientY };
                     this.touchState.touchStartTime = e.timeStamp;
-                    this.touchState.startTouchPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-                } else if (e.touches.length === 2) {
+                    this.touchState.startTouchPos = { x: touches[0].clientX, y: touches[0].clientY };
+
+                } else if (touches.length === 2) {
                     this.touchState.isTwoFingerManipulating = true;
-                    const t0 = e.touches[0]; const t1 = e.touches[1];
+                    const t0 = touches[0]; const t1 = touches[1];
                     const dx = t0.clientX - t1.clientX; const dy = t0.clientY - t1.clientY;
                     this.touchState.startDist = Math.sqrt(dx * dx + dy * dy);
                     this.touchState.startAngle = Math.atan2(dy, dx);
@@ -103,19 +100,19 @@
                     this.touchState.startRotation.copy(this.target.rotation);
                     this.touchState.lastPanPos = { x: (t0.clientX + t1.clientX) / 2, y: (t0.clientY + t1.clientY) / 2 };
                 }
-                this.canvas.addEventListener('touchmove', this.onTouchMove);
             },
             onTouchMove: function (e) {
-                if (this.touchState.isOneFingerRotating && e.touches.length === 1) {
-                    const currentPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+                const touches = e.touches;
+                if (this.touchState.isOneFingerRotating && touches.length === 1) {
+                    const currentPos = { x: touches[0].clientX, y: touches[0].clientY };
                     const deltaX = currentPos.x - this.touchState.lastRotatePos.x;
                     const deltaY = currentPos.y - this.touchState.lastRotatePos.y;
                     this.target.rotation.y += deltaX * 0.01;
                     this.target.rotation.x += deltaY * 0.01;
                     this.touchState.lastRotatePos = currentPos;
                 }
-                if (this.touchState.isTwoFingerManipulating && e.touches.length === 2) {
-                    const t0 = e.touches[0]; const t1 = e.touches[1];
+                if (this.touchState.isTwoFingerManipulating && touches.length === 2) {
+                    const t0 = touches[0]; const t1 = touches[1];
                     const dx = t0.clientX - t1.clientX; const dy = t0.clientY - t1.clientY;
                     const currentPanPos = { x: (t0.clientX + t1.clientX) / 2, y: (t0.clientY + t1.clientY) / 2 };
                     const panDeltaX = currentPanPos.x - this.touchState.lastPanPos.x;
@@ -132,10 +129,11 @@
                 }
             },
             onTouchEnd: function (e) {
-                if (this.touchState.isOneFingerRotating && e.touches.length === 0) {
+                if (this.touchState.isOneFingerRotating) {
+                    const changedTouches = e.changedTouches;
                     const duration = e.timeStamp - this.touchState.touchStartTime;
-                    const dx = e.changedTouches[0].clientX - this.touchState.startTouchPos.x;
-                    const dy = e.changedTouches[0].clientY - this.touchState.startTouchPos.y;
+                    const dx = changedTouches[0].clientX - this.touchState.startTouchPos.x;
+                    const dy = changedTouches[0].clientY - this.touchState.startTouchPos.y;
                     const dist = Math.sqrt(dx * dx + dy * dy);
                     if (duration < 200 && dist < 10) {
                         this.videoAsset.muted = !this.videoAsset.muted;
@@ -143,7 +141,6 @@
                 }
                 this.touchState.isOneFingerRotating = false;
                 this.touchState.isTwoFingerManipulating = false;
-                this.canvas.removeEventListener('touchmove', this.onTouchMove);
             }
         });
     </script>
