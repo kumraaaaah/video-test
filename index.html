@@ -10,23 +10,46 @@
         AFRAME.registerComponent('scene-manager', {
             init: function() {
                 this.marker = document.querySelector("a-marker");
+                this.carouselRig = document.querySelector("#carousel-rig");
                 this.videoAsset = document.querySelector("#vid");
-                // The video entity is now the main thing to show
-                this.videoEntity = document.querySelector("#ar-video");
 
                 this.marker.addEventListener('markerFound', () => {
-                    this.videoEntity.setAttribute('visible', 'true');
+                    this.carouselRig.setAttribute('visible', 'true');
                     this.videoAsset.play();
                 });
             }
         });
-        
-        // --- This component is no longer needed as we removed the buttons ---
-        // You can delete this section if you want to clean up the code.
+
+        // --- SCRIPT TO MANAGE THE VIDEO CAROUSEL ---
         AFRAME.registerComponent('video-carousel', {
             init: function () {
+                // --- ADD YOUR VIDEO URLS HERE ---
+                this.videoSources = [
+                    'assets/@KRSNAOfficial - No Cap (Live Performance Video)_2.mp4',
+                    'path/to/your/second_video.mp4' // Replace this with the path to your second video
+                ];
+
+                this.currentIndex = 0;
                 this.videoAsset = document.querySelector("#vid");
-                this.videoAsset.setAttribute('src', 'assets/@KRSNAOfficial - No Cap (Live Performance Video)_2.mp4');
+                this.nextButton = document.querySelector("#next-button");
+                this.prevButton = document.querySelector("#prev-button");
+
+                this.videoAsset.setAttribute('src', this.videoSources[this.currentIndex]);
+
+                this.nextButton.addEventListener('click', () => {
+                    this.currentIndex = (this.currentIndex + 1) % this.videoSources.length;
+                    this.loadVideo();
+                });
+
+                this.prevButton.addEventListener('click', () => {
+                    this.currentIndex = (this.currentIndex - 1 + this.videoSources.length) % this.videoSources.length;
+                    this.loadVideo();
+                });
+            },
+            loadVideo: function () {
+                this.videoAsset.setAttribute('src', this.videoSources[this.currentIndex]);
+                this.videoAsset.load();
+                this.videoAsset.play();
             }
         });
 
@@ -35,8 +58,9 @@
             init: function () {
                 this.target = this.el.object3D;
                 this.canvas = this.el.sceneEl.canvas;
-                // NEW: Get a reference to the video asset for audio control
                 this.videoAsset = document.querySelector("#vid");
+                // NEW: Get a reference to the raycaster to check for button clicks
+                this.raycaster = this.el.sceneEl.components.raycaster;
 
                 this.touchState = {
                     isOneFingerRotating: false,
@@ -47,12 +71,10 @@
                     startRotation: new THREE.Euler(),
                     lastPanPos: { x: 0, y: 0 },
                     lastRotatePos: { x: 0, y: 0 },
-                    // NEW: Variables to detect a tap
                     touchStartTime: 0,
                     startTouchPos: { x: 0, y: 0 }
                 };
 
-                // Bind event listeners
                 this.onTouchStart = this.onTouchStart.bind(this);
                 this.onTouchMove = this.onTouchMove.bind(this);
                 this.onTouchEnd = this.onTouchEnd.bind(this);
@@ -62,10 +84,15 @@
             },
 
             onTouchStart: function (e) {
+                // NEW: Check if the touch started on a UI button. If so, do nothing.
+                const intersectedEls = this.raycaster ? this.raycaster.intersectedEls : [];
+                if (intersectedEls.some(el => el.classList.contains('clickable'))) {
+                    return; // Ignore this touch because it's on a button
+                }
+
                 if (e.touches.length === 1) {
                     this.touchState.isOneFingerRotating = true;
                     this.touchState.lastRotatePos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-                    // NEW: Record start time and position for tap detection
                     this.touchState.touchStartTime = e.timeStamp;
                     this.touchState.startTouchPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
 
@@ -83,7 +110,6 @@
             },
 
             onTouchMove: function (e) {
-                // Logic for rotation, pan, pinch, and twist is unchanged
                 if (this.touchState.isOneFingerRotating && e.touches.length === 1) {
                     const currentPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
                     const deltaX = currentPos.x - this.touchState.lastRotatePos.x;
@@ -113,20 +139,15 @@
             },
 
             onTouchEnd: function (e) {
-                // NEW: Tap detection logic
                 if (this.touchState.isOneFingerRotating && e.touches.length === 0) {
                     const duration = e.timeStamp - this.touchState.touchStartTime;
                     const dx = e.changedTouches[0].clientX - this.touchState.startTouchPos.x;
                     const dy = e.changedTouches[0].clientY - this.touchState.startTouchPos.y;
                     const dist = Math.sqrt(dx * dx + dy * dy);
-
-                    // If the touch was very short and didn't move much, it's a tap
                     if (duration < 200 && dist < 10) {
                         this.videoAsset.muted = !this.videoAsset.muted;
                     }
                 }
-
-                // Reset states
                 this.touchState.isOneFingerRotating = false;
                 this.touchState.isTwoFingerManipulating = false;
                 this.canvas.removeEventListener('touchmove', this.onTouchMove);
@@ -142,17 +163,29 @@
         id="scene" embedded scene-manager>
 
         <a-assets>
-            <video id="vid" src="assets/@KRSNAOfficial - No Cap (Live Performance Video)_2.mp4" preload="auto" response-type="arraybuffer" loop crossorigin
-                webkit-playsinline playsinline></video>
+            <video id="vid" preload="auto" response-type="arraybuffer" loop crossorigin
+                webkit-playsinline muted playsinline></video>
         </a-assets>
 
         <a-marker type="pattern" preset="custom" url="assets/marker.patt"></a-marker>
         
-        <a-entity camera>
+        <a-entity camera raycaster="objects: [screen-manipulator], .clickable;">
             
-            <a-video id="ar-video" src="#vid" scale="0.8 0.8 0.8" position="0 0 -2" rotation="0 0 0" 
-                screen-manipulator visible="false"></a-video>
+            <a-entity id="carousel-rig" video-carousel visible="false">
                 
+                <a-video id="ar-video" src="#vid" scale="0.8 0.8 0.8" position="0 0 -2" rotation="0 0 0" 
+                    screen-manipulator></a-video>
+
+                <a-plane id="next-button" class="clickable" color="#222" height="0.2" width="0.2" position="0.6 0 -1.99" opacity="0.6">
+                    <a-text value=">" align="center" color="white" width="1"></a-text>
+                </a-plane>
+
+                <a-plane id="prev-button" class="clickable" color="#222" height="0.2" width="0.2" position="-0.6 0 -1.99" opacity="0.6">
+                    <a-text value="<" align="center" color="white" width="1"></a-text>
+                </a-plane>
+
+            </a-entity>
+
         </a-entity>
 
     </a-scene>
