@@ -1,313 +1,174 @@
 <!doctype html>
-
 <html>
 
-
-
 <head>
-
-    <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-
-    <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.5/aframe/build/aframe-ar.js"></script>
-
-    
-
-   <style>
-
-        /* Style for the instruction text overlay */
-
-        .instructions-text {
-
-            position: absolute;
-
-            bottom: 30px; /* Position from the bottom */
-
-            left: 0;      /* Align to the left edge of the screen */
-
-            width: 100%;
-
-            text-align: center;
-
-            
-
-            /* KEY CHANGE: Using a universal font that requires no imports */
-
-            font-family: Arial, Helvetica, sans-serif; 
-
-            
-
-            font-size: 16px;
-
-            color: white;
-
-            text-shadow: 0 0 8px black; /* Makes text readable */
-
-            z-index: 9999; /* Ensures text is on top of the AR scene */
-
-            pointer-events: none; /* Allows touches to pass through the text */
-
-        }
-
-    </style>
-
-    
-
-    <script>
-
-        AFRAME.registerComponent('gesture-player', {
-
-            init: function () {
-
-                this.videoSources = [
-
-                    'assets/ezgif-512a1a0aa7266c.mp4',
-
-                    'assets/test 3.webm'
-
-                ];
-
-                this.currentIndex = 0;
-
-                
-
-                this.marker = this.el.sceneEl.querySelector("a-marker");
-
-                this.videoAsset = this.el.sceneEl.querySelector("#vid");
-
-                this.videoEntity = this.el.querySelector("#ar-video");
-
-                this.target = this.videoEntity.object3D;
-
-                this.canvas = this.el.sceneEl.canvas;
-
-
-
-                this.touchState = {
-
-                    isOneFingerRotating: false, isTwoFingerManipulating: false,
-
-                    startDist: 0, startAngle: 0, startScale: new THREE.Vector3(),
-
-                    startRotation: new THREE.Euler(), lastPanPos: { x: 0, y: 0 },
-
-                    lastRotatePos: { x: 0, y: 0 }, touchStartTime: 0,
-
-                    startTouchPos: { x: 0, y: 0 }
-
-                };
-
-
-
-                this.onMarkerFound = this.onMarkerFound.bind(this);
-
-                this.handleTouchStart = this.handleTouchStart.bind(this);
-
-                this.handleTouchMove = this.handleTouchMove.bind(this);
-
-                this.handleTouchEnd = this.handleTouchEnd.bind(this);
-
-
-
-                this.marker.addEventListener('markerFound', this.onMarkerFound);
-
-                this.canvas.addEventListener('touchstart', this.handleTouchStart);
-
-                this.canvas.addEventListener('touchend', this.handleTouchEnd);
-
-
-
-                this.videoAsset.setAttribute('src', this.videoSources[this.currentIndex]);
-
-            },
-
-
-
-            onMarkerFound: function () {
-
-                this.el.setAttribute('visible', 'true');
-
-                this.videoAsset.play();
-
-            },
-
-            
-
-            loadVideo: function () {
-
-                this.videoAsset.setAttribute('src', this.videoSources[this.currentIndex]);
-
-                this.videoAsset.load();
-
-                this.videoAsset.play();
-
-            },
-
-
-
-            handleTouchStart: function (evt) {
-
-                this.canvas.addEventListener('touchmove', this.handleTouchMove);
-
-                const touches = evt.touches;
-
-                if (touches.length === 1) {
-
-                    this.touchState.isOneFingerRotating = true;
-
-                    this.touchState.lastRotatePos = { x: touches[0].clientX, y: touches[0].clientY };
-
-                    this.touchState.touchStartTime = evt.timeStamp;
-
-                    this.touchState.startTouchPos = { x: touches[0].clientX, y: touches[0].clientY };
-
-                } else if (touches.length === 2) {
-
-                    this.touchState.isTwoFingerManipulating = true;
-
-                    const t0 = touches[0]; const t1 = touches[1];
-
-                    const dx = t0.clientX - t1.clientX; const dy = t0.clientY - t1.clientY;
-
-                    this.touchState.startDist = Math.sqrt(dx * dx + dy * dy);
-
-                    this.touchState.startAngle = Math.atan2(dy, dx);
-
-                    this.touchState.startScale.copy(this.target.scale);
-
-                    this.touchState.startRotation.copy(this.target.rotation);
-
-                    this.touchState.lastPanPos = { x: (t0.clientX + t1.clientX) / 2, y: (t0.clientY + t1.clientY) / 2 };
-
-                }
-
-            },
-
-            handleTouchMove: function (evt) {
-
-                const touches = evt.touches;
-
-                if (this.touchState.isOneFingerRotating && touches.length === 1) {
-
-                    const currentPos = { x: touches[0].clientX, y: touches[0].clientY };
-
-                    const deltaX = currentPos.x - this.touchState.lastRotatePos.x;
-
-                    const deltaY = currentPos.y - this.touchState.lastRotatePos.y;
-
-                    this.target.rotation.y += deltaX * 0.01;
-
-                    this.target.rotation.x += deltaY * 0.01;
-
-                    this.touchState.lastRotatePos = currentPos;
-
-                }
-
-                if (this.touchState.isTwoFingerManipulating && touches.length === 2) {
-
-                    const t0 = touches[0]; const t1 = touches[1];
-
-                    const dx = t0.clientX - t1.clientX; const dy = t0.clientY - t1.clientY;
-
-                    const currentPanPos = { x: (t0.clientX + t1.clientX) / 2, y: (t0.clientY + t1.clientY) / 2 };
-
-                    const panDeltaX = currentPanPos.x - this.touchState.lastPanPos.x;
-
-                    const panDeltaY = currentPanPos.y - this.touchState.lastPanPos.y;
-
-                    this.target.position.x += panDeltaX * 0.005;
-
-                    this.target.position.y -= panDeltaY * 0.005;
-
-                    this.touchState.lastPanPos = currentPanPos;
-
-                    const currentDist = Math.sqrt(dx * dx + dy * dy);
-
-                    const scaleFactor = currentDist / this.touchState.startDist;
-
-                    this.target.scale.copy(this.touchState.startScale).multiplyScalar(scaleFactor);
-
-                    const currentAngle = Math.atan2(dy, dx);
-
-                    const deltaAngle = currentAngle - this.touchState.startAngle;
-
-                    this.target.rotation.z = this.touchState.startRotation.z - deltaAngle;
-
-                }
-
-            },
-
-            handleTouchEnd: function (evt) {
-
-                this.canvas.removeEventListener('touchmove', this.handleTouchMove);
-
-                if (this.touchState.isOneFingerRotating) {
-
-                    const touch = evt.changedTouches[0];
-
-                    const duration = evt.timeStamp - this.touchState.touchStartTime;
-
-                    const deltaX = touch.clientX - this.touchState.startTouchPos.x;
-
-                    const deltaY = touch.clientY - this.touchState.startTouchPos.y;
-
-                    const dist = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-
-                    if (duration < 250 && dist < 15) {
-
-                        this.videoAsset.muted = !this.videoAsset.muted;
-
-                    } else if (duration < 500 && Math.abs(deltaX) > 40 && Math.abs(deltaY) < 30) {
-
-                        if (deltaX < 0) {
-
-                            this.currentIndex = (this.currentIndex + 1) % this.videoSources.length;
-
-                            this.loadVideo();
-
-                        } else {
-
-                            this.currentIndex = (this.currentIndex - 1 + this.videoSources.length) % this.videoSources.length;
-
-                            this.loadVideo();
-
-                        }
-
-                    }
-
-                }
-
-                this.touchState.isOneFingerRotating = false;
-
-                this.touchState.isTwoFingerManipulating = false;
-
-            }
-
-        });
-
-    </script>
-
+    <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.5/aframe/build/aframe-ar.js"></script>
+    
+    <style>
+        /* Import your custom font file */
+        @font-face {
+            font-family: 'ROG Font';
+            /* IMPORTANT: You must have the ROG Font file and place it in your assets folder.
+               Update the URL here to point to your specific font file. */
+            src: url('assets/rog_font.woff2') format('woff2'); 
+        }
+
+        /* Style for the instruction text overlay */
+        .instructions-text {
+            position: absolute;
+            bottom: 30px; /* Position from the bottom */
+            width: 100%;
+            text-align: center;
+            font-family: 'ROG Font', sans-serif; /* Use ROG Font */
+            font-size: 16px;
+            color: white;
+            text-shadow: 0 0 8px black; /* Makes text readable on any background */
+            z-index: 10; /* Ensures text is on top of the AR scene */
+            pointer-events: none; /* Allows touches to pass through the text to the scene */
+        }
+    </style>
+    
+    <script>
+        AFRAME.registerComponent('gesture-player', {
+            init: function () {
+                this.videoSources = [
+                    'assets/@KRSNAOfficial - No Cap (Live Performance Video)_2.mp4',
+                    'assets/ezgif-512a1a0aa7266c.mp4',
+                    'assets/test 3.webm'
+                ];
+                this.currentIndex = 0;
+                
+                this.marker = this.el.sceneEl.querySelector("a-marker");
+                this.videoAsset = this.el.sceneEl.querySelector("#vid");
+                this.videoEntity = this.el.querySelector("#ar-video");
+                this.target = this.videoEntity.object3D;
+                this.canvas = this.el.sceneEl.canvas;
+
+                this.touchState = {
+                    isOneFingerRotating: false, isTwoFingerManipulating: false,
+                    startDist: 0, startAngle: 0, startScale: new THREE.Vector3(),
+                    startRotation: new THREE.Euler(), lastPanPos: { x: 0, y: 0 },
+                    lastRotatePos: { x: 0, y: 0 }, touchStartTime: 0,
+                    startTouchPos: { x: 0, y: 0 }
+                };
+
+                this.onMarkerFound = this.onMarkerFound.bind(this);
+                this.handleTouchStart = this.handleTouchStart.bind(this);
+                this.handleTouchMove = this.handleTouchMove.bind(this);
+                this.handleTouchEnd = this.handleTouchEnd.bind(this);
+
+                this.marker.addEventListener('markerFound', this.onMarkerFound);
+                this.canvas.addEventListener('touchstart', this.handleTouchStart);
+                this.canvas.addEventListener('touchend', this.handleTouchEnd);
+
+                this.videoAsset.setAttribute('src', this.videoSources[this.currentIndex]);
+            },
+
+            onMarkerFound: function () {
+                this.el.setAttribute('visible', 'true');
+                this.videoAsset.play();
+            },
+            
+            loadVideo: function () {
+                this.videoAsset.setAttribute('src', this.videoSources[this.currentIndex]);
+                this.videoAsset.load();
+                this.videoAsset.play();
+            },
+
+            handleTouchStart: function (evt) {
+                this.canvas.addEventListener('touchmove', this.handleTouchMove);
+                const touches = evt.touches;
+                if (touches.length === 1) {
+                    this.touchState.isOneFingerRotating = true;
+                    this.touchState.lastRotatePos = { x: touches[0].clientX, y: touches[0].clientY };
+                    this.touchState.touchStartTime = evt.timeStamp;
+                    this.touchState.startTouchPos = { x: touches[0].clientX, y: touches[0].clientY };
+                } else if (touches.length === 2) {
+                    this.touchState.isTwoFingerManipulating = true;
+                    const t0 = touches[0]; const t1 = touches[1];
+                    const dx = t0.clientX - t1.clientX; const dy = t0.clientY - t1.clientY;
+                    this.touchState.startDist = Math.sqrt(dx * dx + dy * dy);
+                    this.touchState.startAngle = Math.atan2(dy, dx);
+                    this.touchState.startScale.copy(this.target.scale);
+                    this.touchState.startRotation.copy(this.target.rotation);
+                    this.touchState.lastPanPos = { x: (t0.clientX + t1.clientX) / 2, y: (t0.clientY + t1.clientY) / 2 };
+                }
+            },
+            handleTouchMove: function (evt) {
+                const touches = evt.touches;
+                if (this.touchState.isOneFingerRotating && touches.length === 1) {
+                    const currentPos = { x: touches[0].clientX, y: touches[0].clientY };
+                    const deltaX = currentPos.x - this.touchState.lastRotatePos.x;
+                    const deltaY = currentPos.y - this.touchState.lastRotatePos.y;
+                    this.target.rotation.y += deltaX * 0.01;
+                    this.target.rotation.x += deltaY * 0.01;
+                    this.touchState.lastRotatePos = currentPos;
+                }
+                if (this.touchState.isTwoFingerManipulating && touches.length === 2) {
+                    const t0 = touches[0]; const t1 = touches[1];
+                    const dx = t0.clientX - t1.clientX; const dy = t0.clientY - t1.clientY;
+                    const currentPanPos = { x: (t0.clientX + t1.clientX) / 2, y: (t0.clientY + t1.clientY) / 2 };
+                    const panDeltaX = currentPanPos.x - this.touchState.lastPanPos.x;
+                    const panDeltaY = currentPanPos.y - this.touchState.lastPanPos.y;
+                    this.target.position.x += panDeltaX * 0.005;
+                    this.target.position.y -= panDeltaY * 0.005;
+                    this.touchState.lastPanPos = currentPanPos;
+                    const currentDist = Math.sqrt(dx * dx + dy * dy);
+                    const scaleFactor = currentDist / this.touchState.startDist;
+                    this.target.scale.copy(this.touchState.startScale).multiplyScalar(scaleFactor);
+                    const currentAngle = Math.atan2(dy, dx);
+                    const deltaAngle = currentAngle - this.touchState.startAngle;
+                    this.target.rotation.z = this.touchState.startRotation.z - deltaAngle;
+                }
+            },
+            handleTouchEnd: function (evt) {
+                this.canvas.removeEventListener('touchmove', this.handleTouchMove);
+                if (this.touchState.isOneFingerRotating) {
+                    const touch = evt.changedTouches[0];
+                    const duration = evt.timeStamp - this.touchState.touchStartTime;
+                    const deltaX = touch.clientX - this.touchState.startTouchPos.x;
+                    const deltaY = touch.clientY - this.touchState.startTouchPos.y;
+                    const dist = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+                    if (duration < 250 && dist < 15) {
+                        this.videoAsset.muted = !this.videoAsset.muted;
+                    } else if (duration < 500 && Math.abs(deltaX) > 40 && Math.abs(deltaY) < 30) {
+                        if (deltaX < 0) {
+                            this.currentIndex = (this.currentIndex + 1) % this.videoSources.length;
+                            this.loadVideo();
+                        } else {
+                            this.currentIndex = (this.currentIndex - 1 + this.videoSources.length) % this.videoSources.length;
+                            this.loadVideo();
+                        }
+                    }
+                }
+                this.touchState.isOneFingerRotating = false;
+                this.touchState.isTwoFingerManipulating = false;
+            }
+        });
+    </script>
 </head>
-
-
 
 <body style="margin: 0; overflow: hidden;">
 
+    <div class="instructions-text">Swipe ON video for NEXT</div>
 
+    <a-scene vr-mode-ui="enabled: false" loading-screen="enabled: false;"
+        arjs='sourceType: webcam; trackingMethod: best; debugUIEnabled: false;' 
+        id="scene" embedded>
 
-    <div class="instructions-text">Swipe ON video to view NEXT</div>
+        <a-assets>
+            <video id="vid" preload="auto" response-type="arraybuffer" loop crossorigin
+                webkit-playsinline muted playsinline></video>
+        </a-assets>
 
-
-
-    <a-scene vr-mode-ui="enabled: false" loading-screen="enabled: false;"
-
-        arjs='sourceType: webcam; trackingMethod: best; debugUIEnabled: false;' 
-
-        id="scene" embedded>
-
-        
-
-        </a-scene>
-
+        <a-marker type="pattern" preset="custom" url="assets/marker.patt"></a-marker>
+        
+        <a-entity camera>
+            <a-entity id="video-player" gesture-player visible="false">
+                <a-video id="ar-video" src="#vid" scale="0.8 0.8 0.8" position="0 0 -2" rotation="0 0 0"></a-video>
+            </a-entity>
+        </a-entity>
+    </a-scene>
 </body>
-
 </html>
