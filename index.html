@@ -4,19 +4,17 @@
 <head>
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.5/aframe/build/aframe-ar.js"></script>
-
+    
     <script>
         // --- SCRIPT TO TRIGGER THE CAROUSEL TO APPEAR ---
         AFRAME.registerComponent('scene-manager', {
             init: function() {
                 this.marker = document.querySelector("a-marker");
                 this.carouselRig = document.querySelector("#carousel-rig");
-                // KEY CHANGE: Get the video element itself
                 this.videoAsset = document.querySelector("#vid");
 
                 this.marker.addEventListener('markerFound', () => {
                     this.carouselRig.setAttribute('visible', 'true');
-                    // KEY CHANGE: Explicitly tell the video to play
                     this.videoAsset.play();
                 });
             }
@@ -34,7 +32,12 @@
                 this.videoAsset = document.querySelector("#vid");
                 this.nextButton = document.querySelector("#next-button");
                 this.prevButton = document.querySelector("#prev-button");
+                // --- NEW: Get the unmute button and its text label ---
+                this.unmuteButton = document.querySelector("#unmute-button");
+                this.unmuteButtonText = document.querySelector("#unmute-button-text");
+
                 this.videoAsset.setAttribute('src', this.videoSources[this.currentIndex]);
+
                 this.nextButton.addEventListener('click', () => {
                     this.currentIndex = (this.currentIndex + 1) % this.videoSources.length;
                     this.loadVideo();
@@ -42,6 +45,14 @@
                 this.prevButton.addEventListener('click', () => {
                     this.currentIndex = (this.currentIndex - 1 + this.videoSources.length) % this.videoSources.length;
                     this.loadVideo();
+                });
+                
+                // --- NEW: Add click listener for the unmute button ---
+                this.unmuteButton.addEventListener('click', () => {
+                    // Toggle the video's muted state
+                    this.videoAsset.muted = !this.videoAsset.muted;
+                    // Update the button text to show the current state
+                    this.unmuteButtonText.setAttribute('value', this.videoAsset.muted ? 'Unmute' : 'Mute');
                 });
             },
             loadVideo: function () {
@@ -74,9 +85,9 @@
         <a-marker type="pattern" preset="custom" url="assets/marker.patt"></a-marker>
 
         <a-entity camera raycaster="objects: .clickable, [screen-manipulator];">
-
+            
             <a-entity id="carousel-rig" video-carousel visible="false">
-
+                
                 <a-video id="ar-video" src="#vid" scale="0.8 0.8 0.8" position="0 0 -2" rotation="0 0 0" 
                     screen-manipulator></a-video>
 
@@ -88,11 +99,4 @@
                     <a-text value="<" align="center" color="white" width="1"></a-text>
                 </a-plane>
 
-            </a-entity>
-
-        </a-entity>
-
-    </a-scene>
-</body>
-
-</html>
+                <a-plane id="unmute-button" class="clickable" color="#22
