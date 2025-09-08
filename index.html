@@ -20,27 +20,42 @@
             }
         });
 
-        // --- SCRIPT TO MANAGE THE VIDEO CAROUSEL ---
+        // --- CORRECTED SCRIPT TO MANAGE THE VIDEO CAROUSEL ---
         AFRAME.registerComponent('video-carousel', {
-            init: function () {
+            // The 'play' function is a safer place to find other elements and add listeners,
+            // as it runs after the scene has more reliably loaded all its parts.
+            play: function () {
+                // --- PLEASE USE ONLY VIDEO FILES (like .mp4), NOT .gif files ---
                 this.videoSources = [
                     'assets/@KRSNAOfficial - No Cap (Live Performance Video)_2.mp4',
-                    'assets/-Faris-Shafi-and-Talal-Qureshi-unscreen.gif' // Replace with your second video
+                    // I've replaced your .gif with a placeholder .mp4. 
+                    // Please change this to your second VIDEO file.
+                    'https://cdn.glitch.global/c36aa182-16e5-4191-9a7c-12b203fb7d7c/jellyfish.mp4?v=1725528854483' 
                 ];
+
                 this.currentIndex = 0;
                 this.videoAsset = document.querySelector("#vid");
                 this.nextButton = document.querySelector("#next-button");
                 this.prevButton = document.querySelector("#prev-button");
+
+                // Set the initial video source
                 this.videoAsset.setAttribute('src', this.videoSources[this.currentIndex]);
-                this.nextButton.addEventListener('click', () => {
-                    this.currentIndex = (this.currentIndex + 1) % this.videoSources.length;
-                    this.loadVideo();
-                });
-                this.prevButton.addEventListener('click', () => {
-                    this.currentIndex = (this.currentIndex - 1 + this.videoSources.length) % this.videoSources.length;
-                    this.loadVideo();
-                });
+
+                // Use .bind(this) to make sure 'this' refers to our component
+                this.nextButton.addEventListener('click', this.onNext.bind(this));
+                this.prevButton.addEventListener('click', this.onPrev.bind(this));
             },
+
+            onNext: function () {
+                this.currentIndex = (this.currentIndex + 1) % this.videoSources.length;
+                this.loadVideo();
+            },
+
+            onPrev: function () {
+                this.currentIndex = (this.currentIndex - 1 + this.videoSources.length) % this.videoSources.length;
+                this.loadVideo();
+            },
+
             loadVideo: function () {
                 this.videoAsset.setAttribute('src', this.videoSources[this.currentIndex]);
                 this.videoAsset.load();
@@ -48,7 +63,7 @@
             }
         });
 
-        // --- SCRIPT FOR MANIPULATION AND TAPPING ---
+        // --- SCRIPT FOR MANIPULATION AND TAPPING (Unchanged) ---
         AFRAME.registerComponent('screen-manipulator', {
             init: function () {
                 this.target = this.el.object3D;
