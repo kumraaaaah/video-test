@@ -1,6 +1,20 @@
-// --- THIS IS THE ONLY SCRIPT YOU NEED ---
-// It handles the marker, carousel, and all manipulations in one place.
-AFRAME.registerComponent('ar-video-player', {
+<!doctype html>
+
+<html>
+
+
+
+<head>
+
+    <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.5/aframe/build/aframe-ar.js"></script>
+
+    
+
+    <script>
+
+   AFRAME.registerComponent('ar-video-player', {
     init: function () {
         // --- 1. SETUP ---
         this.videoSources = [
@@ -128,3 +142,71 @@ AFRAME.registerComponent('ar-video-player', {
         this.touchState.isTwoFingerManipulating = false;
     }
 });
+
+    </script>
+
+</head>
+
+
+
+<body style="margin: 0; overflow: hidden;">
+
+
+
+    <a-scene vr-mode-ui="enabled: false" loading-screen="enabled: false;"
+
+        arjs='sourceType: webcam; trackingMethod: best; debugUIEnabled: false;' 
+
+        id="scene" embedded scene-manager>
+
+
+
+        <a-assets>
+
+            <video id="vid" preload="auto" response-type="arraybuffer" loop crossorigin
+
+                webkit-playsinline muted playsinline></video>
+
+        </a-assets>
+
+
+
+        <a-marker type="pattern" preset="custom" url="assets/marker.patt"></a-marker>
+
+        
+
+        <a-entity camera raycaster="objects: [screen-manipulator], .clickable;">
+
+            
+
+            <a-entity id="carousel-rig" video-carousel visible="false">
+
+                
+
+                <a-video id="ar-video" src="#vid" scale="0.8 0.8 0.8" position="0 0 -2" rotation="0 0 0" 
+
+                    screen-manipulator></a-video>
+
+
+
+                <a-triangle id="next-button" class="clickable" color="#222" scale="0.1 0.1 0.1" position="0.6 0 -1.99" opacity="0.6" rotation="0 0 -90"></a-triangle>
+
+
+
+                <a-triangle id="prev-button" class="clickable" color="#222" scale="0.1 0.1 0.1" position="-0.6 0 -1.99" opacity="0.6" rotation="0 0 90"></a-triangle>
+
+
+
+            </a-entity>
+
+
+
+        </a-entity>
+
+
+
+    </a-scene>
+
+</body>
+
+</html>
