@@ -7,8 +7,8 @@
     
     <script>
         // --- THIS IS THE ONLY SCRIPT YOU NEED ---
-        // It handles the marker, carousel, and all manipulations in one place.
-        AFRAME.registerComponent('ar-video-player', {
+        // It handles everything: marker detection, video carousel, and all gestures.
+        AFRAME.registerComponent('gesture-player', {
             init: function () {
                 // --- 1. SETUP ---
                 this.videoSources = [
@@ -17,13 +17,11 @@
                 ];
                 this.currentIndex = 0;
                 
-                // Get all elements safely from the scene or this component's children
                 this.marker = this.el.sceneEl.querySelector("a-marker");
                 this.videoAsset = this.el.sceneEl.querySelector("#vid");
                 this.videoEntity = this.el.querySelector("#ar-video");
-                this.nextButton = this.el.querySelector("#next-button");
-                this.prevButton = this.el.querySelector("#prev-button");
                 this.target = this.videoEntity.object3D;
+                this.canvas = this.el.sceneEl.canvas;
 
                 this.touchState = {
                     isOneFingerRotating: false, isTwoFingerManipulating: false,
@@ -35,17 +33,14 @@
 
                 // Bind all 'this' contexts
                 this.onMarkerFound = this.onMarkerFound.bind(this);
-                this.onNext = this.onNext.bind(this);
-                this.onPrev = this.onPrev.bind(this);
                 this.handleTouchStart = this.handleTouchStart.bind(this);
                 this.handleTouchMove = this.handleTouchMove.bind(this);
                 this.handleTouchEnd = this.handleTouchEnd.bind(this);
 
                 // --- 2. ADD EVENT LISTENERS ---
                 this.marker.addEventListener('markerFound', this.onMarkerFound);
-                this.nextButton.addEventListener('click', this.onNext);
-                this.prevButton.addEventListener('click', this.onPrev);
-                this.videoEntity.addEventListener('touchstart', this.handleTouchStart);
+                // Listen on the whole canvas, as we will distinguish gestures ourselves.
+                this.canvas.addEventListener('touchstart', this.handleTouchStart);
 
                 // Set initial video
                 this.videoAsset.setAttribute('src', this.videoSources[this.currentIndex]);
@@ -56,26 +51,19 @@
                 this.videoAsset.play();
             },
             
-            // --- Carousel Logic ---
-            onNext: function () {
-                this.currentIndex = (this.currentIndex + 1) % this.videoSources.length;
-                this.loadVideo();
-            },
-            onPrev: function () {
-                this.currentIndex = (this.currentIndex - 1 + this.videoSources.length) % this.videoSources.length;
-                this.loadVideo();
-            },
+            // --- Carousel Logic (now triggered by swipe) ---
             loadVideo: function () {
                 this.videoAsset.setAttribute('src', this.videoSources[this.currentIndex]);
                 this.videoAsset.load();
                 this.videoAsset.play();
             },
 
-            // --- Manipulation Logic ---
+            // --- Unified Gesture Handling Logic ---
             handleTouchStart: function (evt) {
-                this.el.sceneEl.addEventListener('touchmove', this.handleTouchMove);
-                this.el.sceneEl.addEventListener('touchend', this.handleTouchEnd);
-                const touches = evt.detail.event.touches;
+                this.canvas.addEventListener('touchmove', this.handleTouchMove);
+                this.canvas.addEventListener('touchend', this.handleTouchEnd);
+                
+                const touches = evt.touches;
                 if (touches.length === 1) {
                     this.touchState.isOneFingerRotating = true;
                     this.touchState.lastRotatePos = { x: touches[0].clientX, y: touches[0].clientY };
@@ -120,18 +108,33 @@
                 }
             },
             handleTouchEnd: function (evt) {
-                this.el.sceneEl.removeEventListener('touchmove', this.handleTouchMove);
-                this.el.sceneEl.removeEventListener('touchend', this.handleTouchEnd);
+                this.canvas.removeEventListener('touchmove', this.handleTouchMove);
+                this.canvas.removeEventListener('touchend', this.handleTouchEnd);
+
                 if (this.touchState.isOneFingerRotating) {
-                    const changedTouches = evt.changedTouches;
+                    const touch = evt.changedTouches[0];
                     const duration = evt.timeStamp - this.touchState.touchStartTime;
-                    const dx = changedTouches[0].clientX - this.touchState.startTouchPos.x;
-                    const dy = changedTouches[0].clientY - this.touchState.startTouchPos.y;
-                    const dist = Math.sqrt(dx * dx + dy * dy);
-                    if (duration < 200 && dist < 10) {
+                    const deltaX = touch.clientX - this.touchState.startTouchPos.x;
+                    const deltaY = touch.clientY - this.touchState.startTouchPos.y;
+                    const dist = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+
+                    // --- NEW: Distinguish between Tap, Swipe, and Drag ---
+                    if (duration < 250 && dist < 15) {
+                        // This was a TAP
                         this.videoAsset.muted = !this.videoAsset.muted;
+                    } else if (duration < 500 && Math.abs(deltaX) > 40 && Math.abs(deltaY) < 30) {
+                        // This was a SWIPE
+                        if (deltaX < 0) { // Swipe Left for Next
+                            this.currentIndex = (this.currentIndex + 1) % this.videoSources.length;
+                            this.loadVideo();
+                        } else { // Swipe Right for Previous
+                            this.currentIndex = (this.currentIndex - 1 + this.videoSources.length) % this.videoSources.length;
+                            this.loadVideo();
+                        }
                     }
+                    // Otherwise, it was a drag for rotation, which is already handled in touchmove.
                 }
+
                 this.touchState.isOneFingerRotating = false;
                 this.touchState.isTwoFingerManipulating = false;
             }
@@ -140,7 +143,6 @@
 </head>
 
 <body style="margin: 0; overflow: hidden;">
-
     <a-scene vr-mode-ui="enabled: false" loading-screen="enabled: false;"
         arjs='sourceType: webcam; trackingMethod: best; debugUIEnabled: false;' 
         id="scene" embedded>
@@ -152,20 +154,13 @@
 
         <a-marker type="pattern" preset="custom" url="assets/marker.patt"></a-marker>
         
-        <a-entity camera raycaster="objects: #ar-video, .clickable;">
+        <a-entity camera>
             
-            <a-entity id="carousel-rig" ar-video-player visible="false">
-                
+            <a-entity id="video-player" gesture-player visible="false">
                 <a-video id="ar-video" src="#vid" scale="0.8 0.8 0.8" position="0 0 -2" rotation="0 0 0"></a-video>
-
-                <a-triangle id="next-button" class="clickable" color="#222" scale="0.1 0.1 0.1" position="0.6 0 -1.99" opacity="0.6" rotation="0 0 -90"></a-triangle>
-
-                <a-triangle id="prev-button" class="clickable" color="#222" scale="0.1 0.1 0.1" position="-0.6 0 -1.99" opacity="0.6" rotation="0 0 90"></a-triangle>
-
             </a-entity>
 
         </a-entity>
-
     </a-scene>
 </body>
 </html>
