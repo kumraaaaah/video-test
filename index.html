@@ -6,8 +6,6 @@
     <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.5/aframe/build/aframe-ar.js"></script>
     
     <script>
-        // --- THIS IS THE ONLY SCRIPT YOU NEED ---
-        // It handles everything: marker detection, video carousel, and all gestures.
         AFRAME.registerComponent('gesture-player', {
             init: function () {
                 // --- 1. SETUP ---
@@ -31,7 +29,6 @@
                     startTouchPos: { x: 0, y: 0 }
                 };
 
-                // Bind all 'this' contexts
                 this.onMarkerFound = this.onMarkerFound.bind(this);
                 this.handleTouchStart = this.handleTouchStart.bind(this);
                 this.handleTouchMove = this.handleTouchMove.bind(this);
@@ -39,10 +36,11 @@
 
                 // --- 2. ADD EVENT LISTENERS ---
                 this.marker.addEventListener('markerFound', this.onMarkerFound);
-                // Listen on the whole canvas, as we will distinguish gestures ourselves.
+                
+                // ** THE FIX IS HERE: We add permanent listeners for start and end **
                 this.canvas.addEventListener('touchstart', this.handleTouchStart);
+                this.canvas.addEventListener('touchend', this.handleTouchEnd);
 
-                // Set initial video
                 this.videoAsset.setAttribute('src', this.videoSources[this.currentIndex]);
             },
 
@@ -51,17 +49,15 @@
                 this.videoAsset.play();
             },
             
-            // --- Carousel Logic (now triggered by swipe) ---
             loadVideo: function () {
                 this.videoAsset.setAttribute('src', this.videoSources[this.currentIndex]);
                 this.videoAsset.load();
                 this.videoAsset.play();
             },
 
-            // --- Unified Gesture Handling Logic ---
             handleTouchStart: function (evt) {
+                // ** THE FIX IS HERE: We now ONLY add the 'move' listener during a touch **
                 this.canvas.addEventListener('touchmove', this.handleTouchMove);
-                this.canvas.addEventListener('touchend', this.handleTouchEnd);
                 
                 const touches = evt.touches;
                 if (touches.length === 1) {
@@ -108,8 +104,8 @@
                 }
             },
             handleTouchEnd: function (evt) {
+                // ** THE FIX IS HERE: We now ONLY remove the 'move' listener **
                 this.canvas.removeEventListener('touchmove', this.handleTouchMove);
-                this.canvas.removeEventListener('touchend', this.handleTouchEnd);
 
                 if (this.touchState.isOneFingerRotating) {
                     const touch = evt.changedTouches[0];
@@ -118,12 +114,11 @@
                     const deltaY = touch.clientY - this.touchState.startTouchPos.y;
                     const dist = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
 
-                    // --- NEW: Distinguish between Tap, Swipe, and Drag ---
                     if (duration < 250 && dist < 15) {
-                        // This was a TAP
+                        // TAP
                         this.videoAsset.muted = !this.videoAsset.muted;
                     } else if (duration < 500 && Math.abs(deltaX) > 40 && Math.abs(deltaY) < 30) {
-                        // This was a SWIPE
+                        // SWIPE
                         if (deltaX < 0) { // Swipe Left for Next
                             this.currentIndex = (this.currentIndex + 1) % this.videoSources.length;
                             this.loadVideo();
@@ -132,7 +127,6 @@
                             this.loadVideo();
                         }
                     }
-                    // Otherwise, it was a drag for rotation, which is already handled in touchmove.
                 }
 
                 this.touchState.isOneFingerRotating = false;
@@ -155,11 +149,9 @@
         <a-marker type="pattern" preset="custom" url="assets/marker.patt"></a-marker>
         
         <a-entity camera>
-            
             <a-entity id="video-player" gesture-player visible="false">
                 <a-video id="ar-video" src="#vid" scale="0.8 0.8 0.8" position="0 0 -2" rotation="0 0 0"></a-video>
             </a-entity>
-
         </a-entity>
     </a-scene>
 </body>
