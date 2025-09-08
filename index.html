@@ -10,63 +10,127 @@
         AFRAME.registerComponent('scene-manager', {
             init: function() {
                 this.marker = document.querySelector("a-marker");
-                this.carouselRig = document.querySelector("#carousel-rig");
                 this.videoAsset = document.querySelector("#vid");
+                // The video entity is now the main thing to show
+                this.videoEntity = document.querySelector("#ar-video");
 
                 this.marker.addEventListener('markerFound', () => {
-                    this.carouselRig.setAttribute('visible', 'true');
+                    this.videoEntity.setAttribute('visible', 'true');
                     this.videoAsset.play();
                 });
             }
         });
-
-        // --- SCRIPT TO MANAGE THE VIDEO CAROUSEL ---
+        
+        // --- This component is no longer needed as we removed the buttons ---
+        // You can delete this section if you want to clean up the code.
         AFRAME.registerComponent('video-carousel', {
             init: function () {
-                this.videoSources = [
-                    'assets/@KRSNAOfficial - No Cap (Live Performance Video)_2.mp4',
-                    'https://cdn.glitch.global/c36aa182-16e5-4191-9a7c-12b203fb7d7c/jellyfish.mp4?v=1725528854483',
-                    'https://cdn.glitch.global/c36aa182-16e5-4191-9a7c-12b203fb7d7c/flow.mp4?v=1725528860074'
-                ];
-                this.currentIndex = 0;
                 this.videoAsset = document.querySelector("#vid");
-                this.nextButton = document.querySelector("#next-button");
-                this.prevButton = document.querySelector("#prev-button");
-                // --- NEW: Get the unmute button and its text label ---
-                this.unmuteButton = document.querySelector("#unmute-button");
-                this.unmuteButtonText = document.querySelector("#unmute-button-text");
-
-                this.videoAsset.setAttribute('src', this.videoSources[this.currentIndex]);
-
-                this.nextButton.addEventListener('click', () => {
-                    this.currentIndex = (this.currentIndex + 1) % this.videoSources.length;
-                    this.loadVideo();
-                });
-                this.prevButton.addEventListener('click', () => {
-                    this.currentIndex = (this.currentIndex - 1 + this.videoSources.length) % this.videoSources.length;
-                    this.loadVideo();
-                });
-                
-                // --- NEW: Add click listener for the unmute button ---
-                this.unmuteButton.addEventListener('click', () => {
-                    // Toggle the video's muted state
-                    this.videoAsset.muted = !this.videoAsset.muted;
-                    // Update the button text to show the current state
-                    this.unmuteButtonText.setAttribute('value', this.videoAsset.muted ? 'Unmute' : 'Mute');
-                });
-            },
-            loadVideo: function () {
-                this.videoAsset.setAttribute('src', this.videoSources[this.currentIndex]);
-                this.videoAsset.load();
-                this.videoAsset.play();
+                this.videoAsset.setAttribute('src', 'assets/@KRSNAOfficial - No Cap (Live Performance Video)_2.mp4');
             }
         });
 
-        // --- CUSTOM SCRIPT FOR MANIPULATION (Unchanged) ---
+        // --- UPDATED SCRIPT FOR MANIPULATION AND TAPPING ---
         AFRAME.registerComponent('screen-manipulator', {
             init: function () {
-                this.target=this.el.object3D;this.canvas=this.el.sceneEl.canvas;this.touchState={isOneFingerRotating:!1,isTwoFingerManipulating:!1,startDist:0,startAngle:0,startScale:new THREE.Vector3,startRotation:new THREE.Euler,lastPanPos:{x:0,y:0},lastRotatePos:{x:0,y:0}};this.onTouchStart=this.onTouchStart.bind(this);this.onTouchMove=this.onTouchMove.bind(this);this.onTouchEnd=this.onTouchEnd.bind(this);this.canvas.addEventListener("touchstart",this.onTouchStart);this.canvas.addEventListener("touchend",this.onTouchEnd)
-            }, onTouchStart:function(e){1===e.touches.length?(this.touchState.isOneFingerRotating=!0,this.touchState.lastRotatePos={x:e.touches[0].clientX,y:e.touches[0].clientY}):2===e.touches.length&&(this.touchState.isTwoFingerManipulating=!0,t0=e.touches[0],t1=e.touches[1],dx=t0.clientX-t1.clientX,dy=t0.clientY-t1.clientY,this.touchState.startDist=Math.sqrt(dx*dx+dy*dy),this.touchState.startAngle=Math.atan2(dy,dx),this.touchState.startScale.copy(this.target.scale),this.touchState.startRotation.copy(this.target.rotation),this.touchState.lastPanPos={x:(t0.clientX+t1.clientX)/2,y:(t0.clientY+t1.clientY)/2});this.canvas.addEventListener("touchmove",this.onTouchMove)},onTouchMove:function(e){if(this.touchState.isOneFingerRotating&&1===e.touches.length){const t={x:e.touches[0].clientX,y:e.touches[0].clientY},i=t.x-this.touchState.lastRotatePos.x,s=t.y-this.touchState.lastRotatePos.y;this.target.rotation.y+=.01*i,this.target.rotation.x+=.01*s,this.touchState.lastRotatePos=t}if(this.touchState.isTwoFingerManipulating&&2===e.touches.length){const t=e.touches[0],i=e.touches[1],s=t.clientX-i.clientX,a=t.clientY-i.clientY,o={x:(t.clientX+i.clientX)/2,y:(t.clientY+i.clientY)/2},n=o.x-this.touchState.lastPanPos.x,h=o.y-this.touchState.lastPanPos.y;this.target.position.x+=.005*n,this.target.position.y-=.005*h,this.touchState.lastPanPos=o;const c=Math.sqrt(s*s+a*a),r=c/this.touchState.startDist;this.target.scale.copy(this.touchState.startScale).multiplyScalar(r);const l=Math.atan2(a,s),d=l-this.touchState.startAngle;this.target.rotation.z=this.touchState.startRotation.z-d}},onTouchEnd:function(e){this.touchState.isOneFingerRotating=!1,this.touchState.isTwoFingerManipulating=!1,this.canvas.removeEventListener("touchmove",this.onTouchMove)}
+                this.target = this.el.object3D;
+                this.canvas = this.el.sceneEl.canvas;
+                // NEW: Get a reference to the video asset for audio control
+                this.videoAsset = document.querySelector("#vid");
+
+                this.touchState = {
+                    isOneFingerRotating: false,
+                    isTwoFingerManipulating: false,
+                    startDist: 0,
+                    startAngle: 0,
+                    startScale: new THREE.Vector3(),
+                    startRotation: new THREE.Euler(),
+                    lastPanPos: { x: 0, y: 0 },
+                    lastRotatePos: { x: 0, y: 0 },
+                    // NEW: Variables to detect a tap
+                    touchStartTime: 0,
+                    startTouchPos: { x: 0, y: 0 }
+                };
+
+                // Bind event listeners
+                this.onTouchStart = this.onTouchStart.bind(this);
+                this.onTouchMove = this.onTouchMove.bind(this);
+                this.onTouchEnd = this.onTouchEnd.bind(this);
+
+                this.canvas.addEventListener('touchstart', this.onTouchStart);
+                this.canvas.addEventListener('touchend', this.onTouchEnd);
+            },
+
+            onTouchStart: function (e) {
+                if (e.touches.length === 1) {
+                    this.touchState.isOneFingerRotating = true;
+                    this.touchState.lastRotatePos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+                    // NEW: Record start time and position for tap detection
+                    this.touchState.touchStartTime = e.timeStamp;
+                    this.touchState.startTouchPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+
+                } else if (e.touches.length === 2) {
+                    this.touchState.isTwoFingerManipulating = true;
+                    const t0 = e.touches[0]; const t1 = e.touches[1];
+                    const dx = t0.clientX - t1.clientX; const dy = t0.clientY - t1.clientY;
+                    this.touchState.startDist = Math.sqrt(dx * dx + dy * dy);
+                    this.touchState.startAngle = Math.atan2(dy, dx);
+                    this.touchState.startScale.copy(this.target.scale);
+                    this.touchState.startRotation.copy(this.target.rotation);
+                    this.touchState.lastPanPos = { x: (t0.clientX + t1.clientX) / 2, y: (t0.clientY + t1.clientY) / 2 };
+                }
+                this.canvas.addEventListener('touchmove', this.onTouchMove);
+            },
+
+            onTouchMove: function (e) {
+                // Logic for rotation, pan, pinch, and twist is unchanged
+                if (this.touchState.isOneFingerRotating && e.touches.length === 1) {
+                    const currentPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+                    const deltaX = currentPos.x - this.touchState.lastRotatePos.x;
+                    const deltaY = currentPos.y - this.touchState.lastRotatePos.y;
+                    const sensitivity = 0.01;
+                    this.target.rotation.y += deltaX * sensitivity;
+                    this.target.rotation.x += deltaY * sensitivity;
+                    this.touchState.lastRotatePos = currentPos;
+                }
+                if (this.touchState.isTwoFingerManipulating && e.touches.length === 2) {
+                    const t0 = e.touches[0]; const t1 = e.touches[1];
+                    const dx = t0.clientX - t1.clientX; const dy = t0.clientY - t1.clientY;
+                    const currentPanPos = { x: (t0.clientX + t1.clientX) / 2, y: (t0.clientY + t1.clientY) / 2 };
+                    const panDeltaX = currentPanPos.x - this.touchState.lastPanPos.x;
+                    const panDeltaY = currentPanPos.y - this.touchState.lastPanPos.y;
+                    const panSensitivity = 0.005;
+                    this.target.position.x += panDeltaX * panSensitivity;
+                    this.target.position.y -= panDeltaY * panSensitivity;
+                    this.touchState.lastPanPos = currentPanPos;
+                    const currentDist = Math.sqrt(dx * dx + dy * dy);
+                    const scaleFactor = currentDist / this.touchState.startDist;
+                    this.target.scale.copy(this.touchState.startScale).multiplyScalar(scaleFactor);
+                    const currentAngle = Math.atan2(dy, dx);
+                    const deltaAngle = currentAngle - this.touchState.startAngle;
+                    this.target.rotation.z = this.touchState.startRotation.z - deltaAngle;
+                }
+            },
+
+            onTouchEnd: function (e) {
+                // NEW: Tap detection logic
+                if (this.touchState.isOneFingerRotating && e.touches.length === 0) {
+                    const duration = e.timeStamp - this.touchState.touchStartTime;
+                    const dx = e.changedTouches[0].clientX - this.touchState.startTouchPos.x;
+                    const dy = e.changedTouches[0].clientY - this.touchState.startTouchPos.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+
+                    // If the touch was very short and didn't move much, it's a tap
+                    if (duration < 200 && dist < 10) {
+                        this.videoAsset.muted = !this.videoAsset.muted;
+                    }
+                }
+
+                // Reset states
+                this.touchState.isOneFingerRotating = false;
+                this.touchState.isTwoFingerManipulating = false;
+                this.canvas.removeEventListener('touchmove', this.onTouchMove);
+            }
         });
     </script>
 </head>
@@ -78,25 +142,19 @@
         id="scene" embedded scene-manager>
 
         <a-assets>
-            <video id="vid" preload="auto" response-type="arraybuffer" loop crossorigin
-                webkit-playsinline autoplay muted playsinline></video>
+            <video id="vid" src="assets/@KRSNAOfficial - No Cap (Live Performance Video)_2.mp4" preload="auto" response-type="arraybuffer" loop crossorigin
+                webkit-playsinline playsinline></video>
         </a-assets>
 
         <a-marker type="pattern" preset="custom" url="assets/marker.patt"></a-marker>
-
-        <a-entity camera raycaster="objects: .clickable, [screen-manipulator];">
+        
+        <a-entity camera>
             
-            <a-entity id="carousel-rig" video-carousel visible="false">
+            <a-video id="ar-video" src="#vid" scale="0.8 0.8 0.8" position="0 0 -2" rotation="0 0 0" 
+                screen-manipulator visible="false"></a-video>
                 
-                <a-video id="ar-video" src="#vid" scale="0.8 0.8 0.8" position="0 0 -2" rotation="0 0 0" 
-                    screen-manipulator></a-video>
+        </a-entity>
 
-                <a-plane id="next-button" class="clickable" color="#222" height="0.2" width="0.2" position="0.6 0 -1.99" opacity="0.6">
-                    <a-text value=">" align="center" color="white" width="1"></a-text>
-                </a-plane>
-
-                <a-plane id="prev-button" class="clickable" color="#222" height="0.2" width="0.2" position="-0.6 0 -1.99" opacity="0.6">
-                    <a-text value="<" align="center" color="white" width="1"></a-text>
-                </a-plane>
-
-                <a-plane id="unmute-button" class="clickable" color="#22
+    </a-scene>
+</body>
+</html>
