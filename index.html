@@ -13,10 +13,7 @@
             left: 0;      /* Align to the left edge of the screen */
             width: 100%;
             text-align: center;
-            
-            /* KEY CHANGE: Using a universal font that requires no imports */
             font-family: Arial, Helvetica, sans-serif; 
-            
             font-size: 16px;
             color: white;
             text-shadow: 0 0 8px black; /* Makes text readable */
@@ -29,6 +26,7 @@
         AFRAME.registerComponent('gesture-player', {
             init: function () {
                 this.videoSources = [
+                    'assets/@KRSNAOfficial - No Cap (Live Performance Video)_2.mp4',
                     'assets/ezgif-512a1a0aa7266c.mp4',
                     'assets/test 3.webm'
                 ];
@@ -104,54 +102,3 @@
                     const t0 = touches[0]; const t1 = touches[1];
                     const dx = t0.clientX - t1.clientX; const dy = t0.clientY - t1.clientY;
                     const currentPanPos = { x: (t0.clientX + t1.clientX) / 2, y: (t0.clientY + t1.clientY) / 2 };
-                    const panDeltaX = currentPanPos.x - this.touchState.lastPanPos.x;
-                    const panDeltaY = currentPanPos.y - this.touchState.lastPanPos.y;
-                    this.target.position.x += panDeltaX * 0.005;
-                    this.target.position.y -= panDeltaY * 0.005;
-                    this.touchState.lastPanPos = currentPanPos;
-                    const currentDist = Math.sqrt(dx * dx + dy * dy);
-                    const scaleFactor = currentDist / this.touchState.startDist;
-                    this.target.scale.copy(this.touchState.startScale).multiplyScalar(scaleFactor);
-                    const currentAngle = Math.atan2(dy, dx);
-                    const deltaAngle = currentAngle - this.touchState.startAngle;
-                    this.target.rotation.z = this.touchState.startRotation.z - deltaAngle;
-                }
-            },
-            handleTouchEnd: function (evt) {
-                this.canvas.removeEventListener('touchmove', this.handleTouchMove);
-                if (this.touchState.isOneFingerRotating) {
-                    const touch = evt.changedTouches[0];
-                    const duration = evt.timeStamp - this.touchState.touchStartTime;
-                    const deltaX = touch.clientX - this.touchState.startTouchPos.x;
-                    const deltaY = touch.clientY - this.touchState.startTouchPos.y;
-                    const dist = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-                    if (duration < 250 && dist < 15) {
-                        this.videoAsset.muted = !this.videoAsset.muted;
-                    } else if (duration < 500 && Math.abs(deltaX) > 40 && Math.abs(deltaY) < 30) {
-                        if (deltaX < 0) {
-                            this.currentIndex = (this.currentIndex + 1) % this.videoSources.length;
-                            this.loadVideo();
-                        } else {
-                            this.currentIndex = (this.currentIndex - 1 + this.videoSources.length) % this.videoSources.length;
-                            this.loadVideo();
-                        }
-                    }
-                }
-                this.touchState.isOneFingerRotating = false;
-                this.touchState.isTwoFingerManipulating = false;
-            }
-        });
-    </script>
-</head>
-
-<body style="margin: 0; overflow: hidden;">
-
-    <div class="instructions-text">Swipe ON video to view NEXT</div>
-
-    <a-scene vr-mode-ui="enabled: false" loading-screen="enabled: false;"
-        arjs='sourceType: webcam; trackingMethod: best; debugUIEnabled: false;' 
-        id="scene" embedded>
-        
-        </a-scene>
-</body>
-</html>
