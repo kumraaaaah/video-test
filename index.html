@@ -5,7 +5,7 @@
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.5/aframe/build/aframe-ar.js"></script>
     
-    <style>
+  <style>
         /* Import your custom font file */
         @font-face {
             font-family: 'ROG Font';
@@ -18,13 +18,18 @@
         .instructions-text {
             position: absolute;
             bottom: 30px; /* Position from the bottom */
+            left: 0;      /* Align to the left edge of the screen */
             width: 100%;
             text-align: center;
             font-family: 'ROG Font', sans-serif; /* Use ROG Font */
             font-size: 16px;
             color: white;
             text-shadow: 0 0 8px black; /* Makes text readable on any background */
-            z-index: 10; /* Ensures text is on top of the AR scene */
+            
+            /* --- THE FIX IS HERE --- */
+            /* A very high z-index guarantees the text appears on top of the AR scene */
+            z-index: 9999; 
+            
             pointer-events: none; /* Allows touches to pass through the text to the scene */
         }
     </style>
@@ -33,7 +38,6 @@
         AFRAME.registerComponent('gesture-player', {
             init: function () {
                 this.videoSources = [
-                    'assets/@KRSNAOfficial - No Cap (Live Performance Video)_2.mp4',
                     'assets/ezgif-512a1a0aa7266c.mp4',
                     'assets/test 3.webm'
                 ];
