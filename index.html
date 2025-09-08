@@ -5,13 +5,37 @@
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.5/aframe/build/aframe-ar.js"></script>
     
+    <style>
+        /* Import your custom font file */
+        @font-face {
+            font-family: 'ROG Font';
+            /* IMPORTANT: You must have the ROG Font file and place it in your assets folder.
+               Update the URL here to point to your specific font file. */
+            src: url('assets/rog_font.woff2') format('woff2'); 
+        }
+
+        /* Style for the instruction text overlay */
+        .instructions-text {
+            position: absolute;
+            bottom: 30px; /* Position from the bottom */
+            width: 100%;
+            text-align: center;
+            font-family: 'ROG Font', sans-serif; /* Use ROG Font */
+            font-size: 16px;
+            color: white;
+            text-shadow: 0 0 8px black; /* Makes text readable on any background */
+            z-index: 10; /* Ensures text is on top of the AR scene */
+            pointer-events: none; /* Allows touches to pass through the text to the scene */
+        }
+    </style>
+    
     <script>
         AFRAME.registerComponent('gesture-player', {
             init: function () {
-                // --- 1. SETUP ---
                 this.videoSources = [
                     'assets/@KRSNAOfficial - No Cap (Live Performance Video)_2.mp4',
-                    'assets/ezgif-512a1a0aa7266c.mp4'
+                    'assets/ezgif-512a1a0aa7266c.mp4',
+                    'assets/test 3.webm'
                 ];
                 this.currentIndex = 0;
                 
@@ -34,10 +58,7 @@
                 this.handleTouchMove = this.handleTouchMove.bind(this);
                 this.handleTouchEnd = this.handleTouchEnd.bind(this);
 
-                // --- 2. ADD EVENT LISTENERS ---
                 this.marker.addEventListener('markerFound', this.onMarkerFound);
-                
-                // ** THE FIX IS HERE: We add permanent listeners for start and end **
                 this.canvas.addEventListener('touchstart', this.handleTouchStart);
                 this.canvas.addEventListener('touchend', this.handleTouchEnd);
 
@@ -56,9 +77,7 @@
             },
 
             handleTouchStart: function (evt) {
-                // ** THE FIX IS HERE: We now ONLY add the 'move' listener during a touch **
                 this.canvas.addEventListener('touchmove', this.handleTouchMove);
-                
                 const touches = evt.touches;
                 if (touches.length === 1) {
                     this.touchState.isOneFingerRotating = true;
@@ -104,31 +123,25 @@
                 }
             },
             handleTouchEnd: function (evt) {
-                // ** THE FIX IS HERE: We now ONLY remove the 'move' listener **
                 this.canvas.removeEventListener('touchmove', this.handleTouchMove);
-
                 if (this.touchState.isOneFingerRotating) {
                     const touch = evt.changedTouches[0];
                     const duration = evt.timeStamp - this.touchState.touchStartTime;
                     const deltaX = touch.clientX - this.touchState.startTouchPos.x;
                     const deltaY = touch.clientY - this.touchState.startTouchPos.y;
                     const dist = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-
                     if (duration < 250 && dist < 15) {
-                        // TAP
                         this.videoAsset.muted = !this.videoAsset.muted;
                     } else if (duration < 500 && Math.abs(deltaX) > 40 && Math.abs(deltaY) < 30) {
-                        // SWIPE
-                        if (deltaX < 0) { // Swipe Left for Next
+                        if (deltaX < 0) {
                             this.currentIndex = (this.currentIndex + 1) % this.videoSources.length;
                             this.loadVideo();
-                        } else { // Swipe Right for Previous
+                        } else {
                             this.currentIndex = (this.currentIndex - 1 + this.videoSources.length) % this.videoSources.length;
                             this.loadVideo();
                         }
                     }
                 }
-
                 this.touchState.isOneFingerRotating = false;
                 this.touchState.isTwoFingerManipulating = false;
             }
@@ -137,6 +150,9 @@
 </head>
 
 <body style="margin: 0; overflow: hidden;">
+
+    <div class="instructions-text">Swipe ON video for NEXT</div>
+
     <a-scene vr-mode-ui="enabled: false" loading-screen="enabled: false;"
         arjs='sourceType: webcam; trackingMethod: best; debugUIEnabled: false;' 
         id="scene" embedded>
